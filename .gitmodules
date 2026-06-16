@@ -1,0 +1,15 @@
+[submodule "baseos"]
+	path = baseos
+	url = git@github.com:kubealex/image-mode-baseos.git
+	branch = rhel10.1
+[submodule "frontend"]
+	path = frontend
+	url = git@github.com:kubealex/image-mode-frontend.git
+	branch = v1.0
+[submodule "backend"]
+	path = backend
+	url = git@github.com:kubealex/image-mode-backend.git
+	branch = v1.0
+[submodule "db"]
+	path = db
+	url = git@github.com:kubealex/image-mode-db.git
