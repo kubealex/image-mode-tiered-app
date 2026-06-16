@@ -61,7 +61,7 @@ build_component() {
     build_args+=(--build-arg "$arg")
   done
 
-  podman build "${build_args[@]}" -t "${REGISTRY}/${image}:${tag}" "$dir"
+  podman build ${build_args[@]+"${build_args[@]}"} -t "${REGISTRY}/${image}:${tag}" "$dir"
 
   if [[ -n "$extra_tag" ]]; then
     podman tag "${REGISTRY}/${image}:${tag}" "${REGISTRY}/${image}:${extra_tag}"
@@ -127,11 +127,11 @@ build_component "$SCRIPT_DIR/db" "image-mode-db" "$DB_TAG" ""
 BACKEND_BUILD_ARGS=()
 [[ -n "$DATABASE_URL" ]] && BACKEND_BUILD_ARGS+=("DATABASE_URL=${DATABASE_URL}")
 [[ -n "$BACKEND_PORT" ]] && BACKEND_BUILD_ARGS+=("BACKEND_PORT=${BACKEND_PORT}")
-build_component "$SCRIPT_DIR/backend" "image-mode-backend" "$BACKEND_TAG" "" "${BACKEND_BUILD_ARGS[@]}"
+build_component "$SCRIPT_DIR/backend" "image-mode-backend" "$BACKEND_TAG" "" ${BACKEND_BUILD_ARGS[@]+"${BACKEND_BUILD_ARGS[@]}"}
 
 FRONTEND_BUILD_ARGS=()
 [[ -n "$API_URL" ]] && FRONTEND_BUILD_ARGS+=("API_URL=${API_URL}")
-build_component "$SCRIPT_DIR/frontend" "image-mode-frontend" "$FRONTEND_TAG" "" "${FRONTEND_BUILD_ARGS[@]}"
+build_component "$SCRIPT_DIR/frontend" "image-mode-frontend" "$FRONTEND_TAG" "" ${FRONTEND_BUILD_ARGS[@]+"${FRONTEND_BUILD_ARGS[@]}"}
 
 if [[ "$PUSH" == "true" ]]; then
   echo ""
