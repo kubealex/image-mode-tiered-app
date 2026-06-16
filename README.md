@@ -76,6 +76,15 @@ Build specific versions:
 ./build-and-push.sh --baseos-tag rhel10.1 --frontend-tag v1.0 --backend-tag v1.0
 ```
 
+Build with custom connection strings (baked into the image):
+
+```bash
+./build-and-push.sh \
+  --api-url http://backend.example.com:3001 \
+  --database-url postgresql://postgres:postgres@db.example.com:5432/train_tickets \
+  --backend-port 3001
+```
+
 Run `./build-and-push.sh --help` for all options.
 
 ### Pre-built Images
@@ -90,6 +99,20 @@ podman pull quay.io/kubealex/image-mode-db:pg16
 ```
 
 ## Configuration
+
+Connection strings can be set at **build time** (baked into the image) or **runtime** (environment file on the host). Build-time values are defaults; runtime files override them.
+
+### Build-Time Configuration (Containerfile ARGs)
+
+Pass `--build-arg` to `podman build`, or use the `build-and-push.sh` flags:
+
+| Flag | Containerfile ARG | Default | Description |
+|------|------------------|---------|-------------|
+| `--api-url` | `API_URL` | `http://localhost:3001` | Backend API URL for the frontend proxy |
+| `--database-url` | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/train_tickets` | PostgreSQL connection string |
+| `--backend-port` | `BACKEND_PORT` | `3001` | Backend listen port |
+
+### Runtime Configuration (Environment Files)
 
 The backend and frontend read environment files at boot to allow runtime configuration of connection strings. This is useful when the tiers run on separate hosts instead of localhost.
 
