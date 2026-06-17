@@ -22,6 +22,7 @@ DEFAULT_DOMAIN="demo.lab"
 DEFAULT_DB_SHORT="im-train-db"
 DEFAULT_BACKEND_SHORT="im-train-api"
 DEFAULT_FRONTEND_SHORT="im-train"
+DEFAULT_SUBNET="192.168.150.0/24"
 
 VM_CONFIG_LOADED=false
 INFRA_CONFIG_LOADED=false
@@ -108,8 +109,8 @@ ensure_infra_config() {
   [[ "$INFRA_CONFIG_LOADED" == "true" ]] && return
 
   local subnet
-  read -r -p "  Libvirt network subnet (e.g. 192.168.150.0/24): " subnet
-  SUBNET="$subnet"
+  read -r -p "  Libvirt network subnet [${DEFAULT_SUBNET}]: " subnet
+  SUBNET="${subnet:-$DEFAULT_SUBNET}"
   echo ""
 
   _save_config
@@ -141,7 +142,8 @@ setup_network() {
   ensure_infra_config
   banner "Infrastructure: Configure libvirt network"
 
-  local subnet_base="${SUBNET%.*}"
+  local subnet_cidr="${SUBNET%%/*}"
+  local subnet_base="${subnet_cidr%.*}"
   local subnet_gw="${subnet_base}.1"
   local dhcp_start="${subnet_base}.100"
   local dhcp_end="${subnet_base}.254"
