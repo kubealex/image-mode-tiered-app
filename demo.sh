@@ -59,6 +59,15 @@ short_name() {
   echo "${1%%.*}"
 }
 
+submodule_save_ref() {
+  git -C "$1" symbolic-ref --quiet HEAD 2>/dev/null || git -C "$1" rev-parse HEAD
+}
+
+submodule_restore_ref() {
+  local dir="$1" ref="$2"
+  git -C "$dir" checkout "${ref#refs/heads/}" --quiet 2>/dev/null
+}
+
 # ─────────────────────────────────────────────────────────────
 # Config: load or prompt for VM hostnames
 # ─────────────────────────────────────────────────────────────
@@ -332,6 +341,9 @@ cleanup() {
 act1_build_baseos() {
   banner "Act 1 — Operations: Build Base OS (RHEL 10.1)"
 
+  local saved_ref
+  saved_ref=$(submodule_save_ref "$SCRIPT_DIR/baseos")
+
   step "Building baseos:rhel10.1"
   cd "$SCRIPT_DIR/baseos"
   git checkout rhel10.1 --quiet
@@ -341,6 +353,8 @@ act1_build_baseos() {
   step "Pushing baseos:rhel10.1 + latest"
   podman push "${REGISTRY}/image-mode-baseos:rhel10.1"
   podman push "${REGISTRY}/image-mode-baseos:latest"
+
+  submodule_restore_ref "$SCRIPT_DIR/baseos" "$saved_ref"
 
   echo ""
   step "baseos:latest now points to RHEL 10.1 on ${REGISTRY}"
@@ -379,6 +393,9 @@ act1_convert_qcow2() {
 act2_build_db() {
   banner "Act 2 — DB team: Build and push database image"
 
+  local saved_ref
+  saved_ref=$(submodule_save_ref "$SCRIPT_DIR/db")
+
   step "Building image-mode-db:pg16"
   cd "$SCRIPT_DIR/db"
   git checkout pg16 --quiet
@@ -386,6 +403,8 @@ act2_build_db() {
 
   step "Pushing image-mode-db:pg16"
   podman push "${REGISTRY}/image-mode-db:pg16"
+
+  submodule_restore_ref "$SCRIPT_DIR/db" "$saved_ref"
 
   echo ""
   step "Database image ready on ${REGISTRY}"
@@ -414,6 +433,10 @@ act3_build_apps() {
   ensure_vm_config
   banner "Act 3 — App team: Build and push v1.0"
 
+  local saved_backend saved_frontend
+  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
+  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
+
   step "Building image-mode-backend:v1.0"
   cd "$SCRIPT_DIR/backend"
   git checkout v1.0 --quiet
@@ -433,6 +456,9 @@ act3_build_apps() {
 
   step "Pushing image-mode-frontend:v1.0"
   podman push "${REGISTRY}/image-mode-frontend:v1.0"
+
+  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
+  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
 
   echo ""
   step "App images v1.0 ready on ${REGISTRY}"
@@ -463,6 +489,9 @@ act3_deploy_apps() {
 act4_build_baseos() {
   banner "Act 4 — Operations: Build baseos RHEL 10.2"
 
+  local saved_ref
+  saved_ref=$(submodule_save_ref "$SCRIPT_DIR/baseos")
+
   step "Building baseos:rhel10.2"
   cd "$SCRIPT_DIR/baseos"
   git checkout rhel10.2 --quiet
@@ -473,6 +502,8 @@ act4_build_baseos() {
   podman push "${REGISTRY}/image-mode-baseos:rhel10.2"
   podman push "${REGISTRY}/image-mode-baseos:latest"
 
+  submodule_restore_ref "$SCRIPT_DIR/baseos" "$saved_ref"
+
   echo ""
   step "baseos:latest now points to RHEL 10.2"
 }
@@ -480,6 +511,11 @@ act4_build_baseos() {
 act4_rebuild_all() {
   ensure_vm_config
   banner "Act 4 — All teams: Rebuild on new base OS"
+
+  local saved_db saved_backend saved_frontend
+  saved_db=$(submodule_save_ref "$SCRIPT_DIR/db")
+  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
+  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
 
   step "DB team: Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/db"
@@ -502,6 +538,10 @@ act4_rebuild_all() {
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.0" .
   podman push "${REGISTRY}/image-mode-frontend:v1.0"
+
+  submodule_restore_ref "$SCRIPT_DIR/db" "$saved_db"
+  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
+  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
 
   echo ""
   step "All images rebuilt on RHEL 10.2 base"
@@ -539,6 +579,10 @@ act5_build_v11() {
   ensure_vm_config
   banner "Act 5 — App team: Build and push v1.1"
 
+  local saved_backend saved_frontend
+  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
+  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
+
   step "Building image-mode-backend:v1.1"
   cd "$SCRIPT_DIR/backend"
   git checkout v1.1 --quiet
@@ -558,6 +602,9 @@ act5_build_v11() {
 
   step "Pushing image-mode-frontend:v1.1"
   podman push "${REGISTRY}/image-mode-frontend:v1.1"
+
+  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
+  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
 
   echo ""
   step "App images v1.1 ready on ${REGISTRY}"
