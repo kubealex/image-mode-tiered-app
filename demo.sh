@@ -330,12 +330,14 @@ act1_build_baseos() {
   cd "$SCRIPT_DIR/baseos"
   git checkout rhel10.1 --quiet
   podman build -t "${REGISTRY}/image-mode-baseos:rhel10.1" .
+  podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
 
-  step "Pushing baseos:rhel10.1"
+  step "Pushing baseos:rhel10.1 + latest"
   podman push "${REGISTRY}/image-mode-baseos:rhel10.1"
+  podman push "${REGISTRY}/image-mode-baseos:latest"
 
   echo ""
-  step "baseos:rhel10.1 is ready on ${REGISTRY}"
+  step "baseos:latest now points to RHEL 10.1 on ${REGISTRY}"
 }
 
 act1_convert_qcow2() {
