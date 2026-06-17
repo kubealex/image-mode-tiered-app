@@ -76,13 +76,10 @@ Build specific versions:
 ./build-and-push.sh --baseos-tag rhel10.1 --frontend-tag v1.0 --backend-tag v1.0
 ```
 
-Build with custom connection strings (baked into the image):
+Build with custom hostnames (baked into the image):
 
 ```bash
-./build-and-push.sh \
-  --api-url http://backend.example.com:3001 \
-  --database-url postgresql://postgres:postgres@db.example.com:5432/train_tickets \
-  --backend-port 3001
+./build-and-push.sh --db-host db.example.com --api-host backend.example.com
 ```
 
 Run `./build-and-push.sh --help` for all options.
@@ -100,7 +97,7 @@ podman pull quay.io/kubealex/image-mode-db:pg16
 
 ## Configuration
 
-Connection strings can be set at **build time** (baked into the image) or **runtime** (environment file on the host). Build-time values are defaults; runtime files override them.
+Hostnames can be set at **build time** (baked into the image via `.env` files) or overridden at **runtime** (environment file on the host). The apps read configuration from their own `.env` files; the systemd services provide an optional `EnvironmentFile` for runtime overrides.
 
 ### Build-Time Configuration (Containerfile ARGs)
 
@@ -108,39 +105,36 @@ Pass `--build-arg` to `podman build`, or use the `build-and-push.sh` flags:
 
 | Flag | Containerfile ARG | Default | Description |
 |------|------------------|---------|-------------|
-| `--api-url` | `API_URL` | `http://localhost:3001` | Backend API URL for the frontend proxy |
-| `--database-url` | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/train_tickets` | PostgreSQL connection string |
-| `--backend-port` | `BACKEND_PORT` | `3001` | Backend listen port |
+| `--db-host` | `DB_HOST` | `localhost` | PostgreSQL hostname for the backend |
+| `--api-host` | `API_HOST` | `localhost` | Backend hostname for the frontend proxy |
 
 ### Runtime Configuration (Environment Files)
 
-The backend and frontend read environment files at boot to allow runtime configuration of connection strings. This is useful when the tiers run on separate hosts instead of localhost.
+The backend and frontend systemd services read optional environment files at boot, which override the build-time defaults.
 
 ### Backend
 
 Create `/etc/train-tickets/backend.env` on the backend host:
 
 ```env
-DATABASE_URL=postgresql://postgres:postgres@db-hostname:5432/train_tickets
-PORT=3001
+DB_HOST=db-hostname
 ```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/train_tickets` | PostgreSQL connection string |
-| `PORT` | `3001` | API listen port |
+| `DB_HOST` | `localhost` | PostgreSQL hostname |
 
 ### Frontend
 
 Create `/etc/train-tickets/frontend.env` on the frontend host:
 
 ```env
-API_URL=http://backend-hostname:3001
+API_HOST=backend-hostname
 ```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `API_URL` | `http://localhost:3001` | Backend API URL for the Vite proxy |
+| `API_HOST` | `localhost` | Backend API hostname |
 
 ### Database
 

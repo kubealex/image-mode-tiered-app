@@ -18,10 +18,8 @@ Options:
   --backend-tag TAG      Backend tag to build (default: latest git tag on backend, e.g. v1.1)
   --db-tag TAG           Database tag to build (default: latest git tag on db, e.g. pg16)
   --registry REGISTRY    Container registry prefix (default: quay.io/kubealex)
-  --api-url URL          Backend API URL baked into the frontend image (default: http://localhost:3001)
-  --database-url URL     PostgreSQL connection string baked into the backend image
-                         (default: postgresql://postgres:postgres@localhost:5432/train_tickets)
-  --backend-port PORT    Backend listen port (default: 3001)
+  --db-host HOSTNAME     Database hostname baked into the backend image (default: localhost)
+  --api-host HOSTNAME    Backend hostname baked into the frontend image (default: localhost)
   --no-push              Build only, do not push to registry
   --help                 Show this help
 
@@ -31,7 +29,7 @@ Examples:
   $0 --baseos-tag rhel10.1                  # Build baseos from rhel10.1 tag
   $0 --frontend-tag v1.0 --backend-tag v1.0 # Build older versions
   REGISTRY=quay.io/myorg $0                 # Use a different registry
-  $0 --api-url http://backend.example.com:3001 --database-url postgresql://postgres:postgres@db.example.com:5432/train_tickets
+  $0 --db-host db.example.com --api-host backend.example.com
 EOF
   exit 0
 }
@@ -81,9 +79,8 @@ BASEOS_TAG=""
 FRONTEND_TAG=""
 BACKEND_TAG=""
 DB_TAG=""
-API_URL=""
-DATABASE_URL=""
-BACKEND_PORT=""
+DB_HOST=""
+API_HOST=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -92,9 +89,8 @@ while [[ $# -gt 0 ]]; do
     --backend-tag)  BACKEND_TAG="$2";  shift 2 ;;
     --db-tag)       DB_TAG="$2";       shift 2 ;;
     --registry)     REGISTRY="$2";     shift 2 ;;
-    --api-url)      API_URL="$2";      shift 2 ;;
-    --database-url) DATABASE_URL="$2"; shift 2 ;;
-    --backend-port) BACKEND_PORT="$2"; shift 2 ;;
+    --db-host)      DB_HOST="$2";      shift 2 ;;
+    --api-host)     API_HOST="$2";     shift 2 ;;
     --no-push)      PUSH=false;        shift ;;
     --help)         usage ;;
     *) echo "Unknown option: $1"; usage ;;
@@ -125,12 +121,11 @@ fi
 build_component "$SCRIPT_DIR/db" "image-mode-db" "$DB_TAG" ""
 
 BACKEND_BUILD_ARGS=()
-[[ -n "$DATABASE_URL" ]] && BACKEND_BUILD_ARGS+=("DATABASE_URL=${DATABASE_URL}")
-[[ -n "$BACKEND_PORT" ]] && BACKEND_BUILD_ARGS+=("BACKEND_PORT=${BACKEND_PORT}")
+[[ -n "$DB_HOST" ]] && BACKEND_BUILD_ARGS+=("DB_HOST=${DB_HOST}")
 build_component "$SCRIPT_DIR/backend" "image-mode-backend" "$BACKEND_TAG" "" ${BACKEND_BUILD_ARGS[@]+"${BACKEND_BUILD_ARGS[@]}"}
 
 FRONTEND_BUILD_ARGS=()
-[[ -n "$API_URL" ]] && FRONTEND_BUILD_ARGS+=("API_URL=${API_URL}")
+[[ -n "$API_HOST" ]] && FRONTEND_BUILD_ARGS+=("API_HOST=${API_HOST}")
 build_component "$SCRIPT_DIR/frontend" "image-mode-frontend" "$FRONTEND_TAG" "" ${FRONTEND_BUILD_ARGS[@]+"${FRONTEND_BUILD_ARGS[@]}"}
 
 if [[ "$PUSH" == "true" ]]; then
