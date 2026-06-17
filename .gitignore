@@ -5,3 +5,4 @@ dist/
 package-lock.json
 *.qcow2
 output/
+.demo-config

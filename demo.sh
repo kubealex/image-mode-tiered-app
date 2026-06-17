@@ -4,6 +4,7 @@ set -euo pipefail
 REGISTRY=${REGISTRY:-quay.io/kubealex}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 VM_IMAGES_DIR="$SCRIPT_DIR/vm-images"
+CONFIG_FILE="$SCRIPT_DIR/.demo-config"
 VM_VCPUS=${VM_VCPUS:-2}
 VM_RAM=${VM_RAM:-4096}
 VM_DISK=${VM_DISK:-20}
@@ -16,35 +17,14 @@ YELLOW='\033[33m'
 RED='\033[31m'
 RESET='\033[0m'
 
-# VM hostnames — prompt if not set via environment
-if [[ -z "${VM_DB:-}" || -z "${VM_BACKEND:-}" || -z "${VM_FRONTEND:-}" ]]; then
-  echo -e "${BOLD}${CYAN}VM Hostname Configuration${RESET}"
-  echo ""
-  if [[ -z "${VM_DB:-}" ]]; then
-    read -r -p "  Database VM hostname (e.g. db.example.com): " VM_DB
-  fi
-  if [[ -z "${VM_BACKEND:-}" ]]; then
-    read -r -p "  Backend VM hostname  (e.g. backend.example.com): " VM_BACKEND
-  fi
-  if [[ -z "${VM_FRONTEND:-}" ]]; then
-    read -r -p "  Frontend VM hostname (e.g. frontend.example.com): " VM_FRONTEND
-  fi
-  echo ""
-fi
-VM_USER=${VM_USER:-bootc-user}
+# Defaults
+DEFAULT_DOMAIN="demo.lab"
+DEFAULT_DB_SHORT="im-train-db"
+DEFAULT_BACKEND_SHORT="im-train-api"
+DEFAULT_FRONTEND_SHORT="im-train"
 
-# Derive domain and short names from hostnames
-DOMAIN="${VM_DB#*.}"
-VM_DB_SHORT="${VM_DB%%.*}"
-VM_BACKEND_SHORT="${VM_BACKEND%%.*}"
-VM_FRONTEND_SHORT="${VM_FRONTEND%%.*}"
-
-# Network / subnet — prompt if not set
-if [[ -z "${SUBNET:-}" ]]; then
-  read -r -p "  Libvirt network subnet (e.g. 192.168.150.0/24): " SUBNET
-  echo ""
-fi
-NETWORK_NAME="demo-${DOMAIN//./-}"
+VM_CONFIG_LOADED=false
+INFRA_CONFIG_LOADED=false
 
 banner() {
   echo ""
@@ -74,17 +54,91 @@ pause() {
   echo ""
 }
 
-# ─────────────────────────────────────────────────────────────
-# Helper: extract short name from FQDN
-# ─────────────────────────────────────────────────────────────
 short_name() {
   echo "${1%%.*}"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Config: load or prompt for VM hostnames
+# ─────────────────────────────────────────────────────────────
+ensure_vm_config() {
+  [[ "$VM_CONFIG_LOADED" == "true" ]] && return
+
+  if [[ -f "$CONFIG_FILE" ]]; then
+    source "$CONFIG_FILE"
+    VM_CONFIG_LOADED=true
+    if [[ -n "${SUBNET:-}" ]]; then
+      INFRA_CONFIG_LOADED=true
+    fi
+    _derive_names
+    return
+  fi
+
+  echo -e "${BOLD}${CYAN}VM Hostname Configuration${RESET}"
+  echo ""
+
+  local domain
+  read -r -p "  Domain [${DEFAULT_DOMAIN}]: " domain
+  DOMAIN="${domain:-$DEFAULT_DOMAIN}"
+
+  local db_short
+  read -r -p "  Database VM short name [${DEFAULT_DB_SHORT}]: " db_short
+  VM_DB_SHORT="${db_short:-$DEFAULT_DB_SHORT}"
+
+  local be_short
+  read -r -p "  Backend VM short name  [${DEFAULT_BACKEND_SHORT}]: " be_short
+  VM_BACKEND_SHORT="${be_short:-$DEFAULT_BACKEND_SHORT}"
+
+  local fe_short
+  read -r -p "  Frontend VM short name [${DEFAULT_FRONTEND_SHORT}]: " fe_short
+  VM_FRONTEND_SHORT="${fe_short:-$DEFAULT_FRONTEND_SHORT}"
+  echo ""
+
+  VM_DB="${VM_DB_SHORT}.${DOMAIN}"
+  VM_BACKEND="${VM_BACKEND_SHORT}.${DOMAIN}"
+  VM_FRONTEND="${VM_FRONTEND_SHORT}.${DOMAIN}"
+
+  _save_config
+  VM_CONFIG_LOADED=true
+  _derive_names
+}
+
+ensure_infra_config() {
+  ensure_vm_config
+  [[ "$INFRA_CONFIG_LOADED" == "true" ]] && return
+
+  local subnet
+  read -r -p "  Libvirt network subnet (e.g. 192.168.150.0/24): " subnet
+  SUBNET="$subnet"
+  echo ""
+
+  _save_config
+  INFRA_CONFIG_LOADED=true
+}
+
+_derive_names() {
+  NETWORK_NAME="demo-${DOMAIN//./-}"
+  VM_USER=${VM_USER:-bootc-user}
+}
+
+_save_config() {
+  cat > "$CONFIG_FILE" <<CONF
+DOMAIN="${DOMAIN}"
+VM_DB_SHORT="${VM_DB_SHORT}"
+VM_BACKEND_SHORT="${VM_BACKEND_SHORT}"
+VM_FRONTEND_SHORT="${VM_FRONTEND_SHORT}"
+VM_DB="${VM_DB}"
+VM_BACKEND="${VM_BACKEND}"
+VM_FRONTEND="${VM_FRONTEND}"
+${SUBNET:+SUBNET="${SUBNET}"}
+CONF
 }
 
 # ─────────────────────────────────────────────────────────────
 # Infrastructure: libvirt network with DNS for the domain
 # ─────────────────────────────────────────────────────────────
 setup_network() {
+  ensure_infra_config
   banner "Infrastructure: Configure libvirt network"
 
   local subnet_base="${SUBNET%.*}"
@@ -129,6 +183,7 @@ NETXML
 # Infrastructure: libvirt storage pool
 # ─────────────────────────────────────────────────────────────
 setup_pool() {
+  ensure_infra_config
   banner "Infrastructure: Configure libvirt storage pool"
 
   local pool_name="demo-${DOMAIN//./-}"
@@ -217,6 +272,7 @@ USERDATA
 }
 
 provision_vms() {
+  ensure_infra_config
   banner "Infrastructure: Provision VMs"
 
   create_vm "${VM_DB}"
@@ -232,6 +288,7 @@ provision_vms() {
 # Cleanup: tear down VMs, pool, and network
 # ─────────────────────────────────────────────────────────────
 cleanup() {
+  ensure_vm_config
   banner "Cleanup: Destroying demo environment"
 
   local pool_name="demo-${DOMAIN//./-}"
@@ -253,6 +310,9 @@ cleanup() {
   step "Removing network: ${NETWORK_NAME}"
   sudo virsh net-destroy "${NETWORK_NAME}" 2>/dev/null || true
   sudo virsh net-undefine "${NETWORK_NAME}" 2>/dev/null || true
+
+  step "Removing config file"
+  rm -f "$CONFIG_FILE"
 
   echo ""
   step "Cleanup complete"
@@ -277,6 +337,7 @@ act1_build_baseos() {
 }
 
 act1_convert_qcow2() {
+  ensure_vm_config
   banner "Act 1 — Operations: Convert to qcow2"
 
   step "Converting baseos:rhel10.1 to qcow2 using bootc-image-builder"
@@ -321,6 +382,7 @@ act2_build_db() {
 }
 
 act2_deploy_db() {
+  ensure_vm_config
   banner "Act 2 — DB team: Deploy on VM"
 
   step "Switch the db VM to the database image"
@@ -339,6 +401,7 @@ act2_deploy_db() {
 # Act 3 — App team: Deploy frontend + backend (v1.0)
 # ─────────────────────────────────────────────────────────────
 act3_build_apps() {
+  ensure_vm_config
   banner "Act 3 — App team: Build and push v1.0"
 
   step "Building image-mode-backend:v1.0"
@@ -366,6 +429,7 @@ act3_build_apps() {
 }
 
 act3_deploy_apps() {
+  ensure_vm_config
   banner "Act 3 — App team: Deploy on VMs"
 
   step "Switch the backend VM"
@@ -404,6 +468,7 @@ act4_build_baseos() {
 }
 
 act4_rebuild_all() {
+  ensure_vm_config
   banner "Act 4 — All teams: Rebuild on new base OS"
 
   step "DB team: Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
@@ -433,6 +498,7 @@ act4_rebuild_all() {
 }
 
 act4_upgrade_vms() {
+  ensure_vm_config
   banner "Act 4 — Upgrade all VMs (soft reboot)"
 
   info "Each VM pulls the rebuilt image (same tag, new base OS)."
@@ -460,6 +526,7 @@ act4_upgrade_vms() {
 # Act 5 — App team: Release v1.1 (Timetable feature)
 # ─────────────────────────────────────────────────────────────
 act5_build_v11() {
+  ensure_vm_config
   banner "Act 5 — App team: Build and push v1.1"
 
   step "Building image-mode-backend:v1.1"
@@ -487,6 +554,7 @@ act5_build_v11() {
 }
 
 act5_switch_vms() {
+  ensure_vm_config
   banner "Act 5 — App team: Switch VMs to v1.1 (soft reboot)"
 
   info "Since the image tag changes (v1.0 → v1.1), we use bootc switch."
@@ -516,6 +584,7 @@ usage() {
 Usage: $0 <act> [step]
 
 Run the demo step by step. Each act can be run independently.
+Configuration is prompted on first use and saved to .demo-config.
 
 Acts:
   infra   Set up libvirt network, pool, and provision VMs
@@ -525,11 +594,17 @@ Acts:
   4       Act 4 — OS upgrade to RHEL 10.2 (soft reboot)
   5       Act 5 — App team: Release v1.1 (soft reboot)
   all     Run all acts in sequence (including infra)
-  cleanup Destroy all VMs, storage pool, and network
+  cleanup Destroy all VMs, storage pool, network, and config
 
 Steps (optional, for acts 1-5):
   build   Build and push images only
   deploy  Show VM deployment commands only
+
+Defaults:
+  Domain:   demo.lab
+  DB VM:    im-train-db.demo.lab
+  Backend:  im-train-api.demo.lab
+  Frontend: im-train.demo.lab
 
 Examples:
   $0 infra            # Set up network, pool, provision VMs
@@ -541,10 +616,6 @@ Examples:
 
 Environment:
   REGISTRY       Container registry (default: quay.io/kubealex)
-  VM_FRONTEND    Frontend VM hostname (prompted if not set)
-  VM_BACKEND     Backend VM hostname (prompted if not set)
-  VM_DB          Database VM hostname (prompted if not set)
-  SUBNET         Libvirt network subnet (prompted if not set)
   VM_USER        SSH user (default: bootc-user)
   VM_VCPUS       vCPUs per VM (default: 2)
   VM_RAM         RAM in MiB per VM (default: 4096)
