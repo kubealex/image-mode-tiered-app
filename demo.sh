@@ -3,12 +3,17 @@ set -euo pipefail
 
 REGISTRY=${REGISTRY:-quay.io/kubealex}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+VM_IMAGES_DIR="$SCRIPT_DIR/vm-images"
+VM_VCPUS=${VM_VCPUS:-2}
+VM_RAM=${VM_RAM:-4096}
+VM_DISK=${VM_DISK:-20}
 
 BOLD='\033[1m'
 DIM='\033[2m'
 CYAN='\033[36m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
+RED='\033[31m'
 RESET='\033[0m'
 
 # VM hostnames — prompt if not set via environment
@@ -16,17 +21,30 @@ if [[ -z "${VM_DB:-}" || -z "${VM_BACKEND:-}" || -z "${VM_FRONTEND:-}" ]]; then
   echo -e "${BOLD}${CYAN}VM Hostname Configuration${RESET}"
   echo ""
   if [[ -z "${VM_DB:-}" ]]; then
-    read -r -p "  Database VM hostname: " VM_DB
+    read -r -p "  Database VM hostname (e.g. db.example.com): " VM_DB
   fi
   if [[ -z "${VM_BACKEND:-}" ]]; then
-    read -r -p "  Backend VM hostname:  " VM_BACKEND
+    read -r -p "  Backend VM hostname  (e.g. backend.example.com): " VM_BACKEND
   fi
   if [[ -z "${VM_FRONTEND:-}" ]]; then
-    read -r -p "  Frontend VM hostname: " VM_FRONTEND
+    read -r -p "  Frontend VM hostname (e.g. frontend.example.com): " VM_FRONTEND
   fi
   echo ""
 fi
 VM_USER=${VM_USER:-bootc-user}
+
+# Derive domain and short names from hostnames
+DOMAIN="${VM_DB#*.}"
+VM_DB_SHORT="${VM_DB%%.*}"
+VM_BACKEND_SHORT="${VM_BACKEND%%.*}"
+VM_FRONTEND_SHORT="${VM_FRONTEND%%.*}"
+
+# Network / subnet — prompt if not set
+if [[ -z "${SUBNET:-}" ]]; then
+  read -r -p "  Libvirt network subnet (e.g. 192.168.150.0/24): " SUBNET
+  echo ""
+fi
+NETWORK_NAME="demo-${DOMAIN//./-}"
 
 banner() {
   echo ""
@@ -54,6 +72,178 @@ pause() {
   echo ""
   read -r -p "  Press Enter to continue..."
   echo ""
+}
+
+# ─────────────────────────────────────────────────────────────
+# Helper: extract short name from FQDN
+# ─────────────────────────────────────────────────────────────
+short_name() {
+  echo "${1%%.*}"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Infrastructure: libvirt network with DNS for the domain
+# ─────────────────────────────────────────────────────────────
+setup_network() {
+  banner "Infrastructure: Configure libvirt network"
+
+  local subnet_base="${SUBNET%.*}"
+  local subnet_gw="${subnet_base}.1"
+  local dhcp_start="${subnet_base}.100"
+  local dhcp_end="${subnet_base}.254"
+
+  step "Creating libvirt network: ${NETWORK_NAME}"
+  info "Subnet: ${SUBNET} — Gateway: ${subnet_gw}"
+  info "DHCP range: ${dhcp_start} – ${dhcp_end}"
+  info "DNS domain: ${DOMAIN}"
+
+  local net_xml
+  net_xml=$(mktemp)
+  cat > "$net_xml" <<NETXML
+<network>
+  <name>${NETWORK_NAME}</name>
+  <forward mode='nat'/>
+  <bridge stp='on' delay='0'/>
+  <domain name='${DOMAIN}' localOnly='yes'/>
+  <dns>
+    <forwarder domain='${DOMAIN}'/>
+  </dns>
+  <ip address='${subnet_gw}' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='${dhcp_start}' end='${dhcp_end}'/>
+    </dhcp>
+  </ip>
+</network>
+NETXML
+
+  sudo virsh net-define "$net_xml"
+  sudo virsh net-start "${NETWORK_NAME}"
+  sudo virsh net-autostart "${NETWORK_NAME}"
+  rm -f "$net_xml"
+
+  echo ""
+  step "Network ${NETWORK_NAME} is active with DNS for ${DOMAIN}"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Infrastructure: libvirt storage pool
+# ─────────────────────────────────────────────────────────────
+setup_pool() {
+  banner "Infrastructure: Configure libvirt storage pool"
+
+  local pool_name="demo-${DOMAIN//./-}"
+  local pool_path="/var/lib/libvirt/images/${DOMAIN}"
+
+  step "Creating storage pool: ${pool_name} at ${pool_path}"
+  sudo mkdir -p "${pool_path}"
+  sudo virsh pool-define-as "${pool_name}" dir --target "${pool_path}"
+  sudo virsh pool-build "${pool_name}"
+  sudo virsh pool-start "${pool_name}"
+  sudo virsh pool-autostart "${pool_name}"
+
+  step "Copying VM images to pool"
+  for img in "$VM_IMAGES_DIR"/*.qcow2; do
+    local fname
+    fname=$(basename "$img")
+    sudo cp "$img" "${pool_path}/${fname}"
+    sudo virsh pool-refresh "${pool_name}"
+    info "  ${fname} → ${pool_path}/${fname}"
+  done
+
+  echo ""
+  step "Storage pool ${pool_name} is ready"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Infrastructure: create a VM with cloud-init hostname
+# ─────────────────────────────────────────────────────────────
+create_vm() {
+  local fqdn="$1"
+  local vm_short
+  vm_short=$(short_name "$fqdn")
+
+  local pool_name="demo-${DOMAIN//./-}"
+  local pool_path="/var/lib/libvirt/images/${DOMAIN}"
+  local disk="${pool_path}/${vm_short}.qcow2"
+  local cloudinit_dir
+  cloudinit_dir=$(mktemp -d)
+
+  step "Creating VM: ${vm_short} (${fqdn})"
+
+  cat > "${cloudinit_dir}/meta-data" <<META
+instance-id: ${vm_short}
+local-hostname: ${fqdn}
+META
+
+  cat > "${cloudinit_dir}/user-data" <<USERDATA
+#cloud-config
+hostname: ${vm_short}
+fqdn: ${fqdn}
+manage_etc_hosts: true
+USERDATA
+
+  local cloudinit_iso="${pool_path}/${vm_short}-cloudinit.iso"
+  sudo genisoimage -output "${cloudinit_iso}" \
+    -volid cidata -joliet -rock \
+    "${cloudinit_dir}/meta-data" "${cloudinit_dir}/user-data"
+  rm -rf "${cloudinit_dir}"
+
+  sudo qemu-img resize "${disk}" "${VM_DISK}G"
+
+  sudo virt-install \
+    --name "${vm_short}" \
+    --memory "${VM_RAM}" \
+    --vcpus "${VM_VCPUS}" \
+    --disk "${disk}" \
+    --disk "${cloudinit_iso},device=cdrom" \
+    --network "network=${NETWORK_NAME}" \
+    --os-variant rhel10-unknown \
+    --noautoconsole \
+    --import
+
+  info "  VM ${vm_short} started on network ${NETWORK_NAME}"
+}
+
+provision_vms() {
+  banner "Infrastructure: Provision VMs"
+
+  create_vm "${VM_DB}"
+  create_vm "${VM_BACKEND}"
+  create_vm "${VM_FRONTEND}"
+
+  echo ""
+  step "All 3 VMs are running"
+  info "Wait for cloud-init to complete, then SSH with: ssh ${VM_USER}@<hostname>"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Cleanup: tear down VMs, pool, and network
+# ─────────────────────────────────────────────────────────────
+cleanup() {
+  banner "Cleanup: Destroying demo environment"
+
+  local pool_name="demo-${DOMAIN//./-}"
+  local pool_path="/var/lib/libvirt/images/${DOMAIN}"
+
+  for vm_short in "${VM_DB_SHORT}" "${VM_BACKEND_SHORT}" "${VM_FRONTEND_SHORT}"; do
+    step "Destroying VM: ${vm_short}"
+    sudo virsh destroy "${vm_short}" 2>/dev/null || true
+    sudo virsh undefine "${vm_short}" --remove-all-storage 2>/dev/null || true
+    local cloudinit_iso="${pool_path}/${vm_short}-cloudinit.iso"
+    sudo rm -f "${cloudinit_iso}" 2>/dev/null || true
+  done
+
+  step "Removing storage pool: ${pool_name}"
+  sudo virsh pool-destroy "${pool_name}" 2>/dev/null || true
+  sudo virsh pool-undefine "${pool_name}" 2>/dev/null || true
+  sudo rm -rf "${pool_path}" 2>/dev/null || true
+
+  step "Removing network: ${NETWORK_NAME}"
+  sudo virsh net-destroy "${NETWORK_NAME}" 2>/dev/null || true
+  sudo virsh net-undefine "${NETWORK_NAME}" 2>/dev/null || true
+
+  echo ""
+  step "Cleanup complete"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -88,9 +278,16 @@ act1_convert_qcow2() {
     --type qcow2 \
     "${REGISTRY}/image-mode-baseos:rhel10.1"
 
+  mkdir -p "$VM_IMAGES_DIR"
+  for vm_short in "${VM_DB_SHORT}" "${VM_BACKEND_SHORT}" "${VM_FRONTEND_SHORT}"; do
+    cp "$SCRIPT_DIR/output/qcow2/disk.qcow2" "$VM_IMAGES_DIR/${vm_short}.qcow2"
+    step "Created ${VM_IMAGES_DIR}/${vm_short}.qcow2"
+  done
+
+  rm -rf "$SCRIPT_DIR/output"
+
   echo ""
-  step "qcow2 image ready at: $SCRIPT_DIR/output/qcow2/disk.qcow2"
-  info "Use this disk image to provision 3 VMs: ${VM_FRONTEND}, ${VM_BACKEND}, ${VM_DB}"
+  step "qcow2 images ready in ${VM_IMAGES_DIR}/"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -309,29 +506,37 @@ Usage: $0 <act> [step]
 Run the demo step by step. Each act can be run independently.
 
 Acts:
-  1   Act 1 — Operations: Base OS (RHEL 10.1)
-  2   Act 2 — DB team: Deploy PostgreSQL
-  3   Act 3 — App team: Deploy frontend + backend (v1.0)
-  4   Act 4 — OS upgrade to RHEL 10.2 (soft reboot)
-  5   Act 5 — App team: Release v1.1 (soft reboot)
-  all Run all acts in sequence
+  infra   Set up libvirt network, pool, and provision VMs
+  1       Act 1 — Operations: Base OS (RHEL 10.1)
+  2       Act 2 — DB team: Deploy PostgreSQL
+  3       Act 3 — App team: Deploy frontend + backend (v1.0)
+  4       Act 4 — OS upgrade to RHEL 10.2 (soft reboot)
+  5       Act 5 — App team: Release v1.1 (soft reboot)
+  all     Run all acts in sequence (including infra)
+  cleanup Destroy all VMs, storage pool, and network
 
-Steps (optional):
+Steps (optional, for acts 1-5):
   build   Build and push images only
   deploy  Show VM deployment commands only
 
 Examples:
-  $0 1              # Full Act 1 (build + qcow2)
-  $0 2 build        # Act 2 build only
-  $0 3 deploy       # Act 3 VM commands only
-  $0 all            # Full demo
+  $0 infra            # Set up network, pool, provision VMs
+  $0 1                # Full Act 1 (build + qcow2)
+  $0 2 build          # Act 2 build only
+  $0 3 deploy         # Act 3 VM commands only
+  $0 all              # Full demo
+  $0 cleanup          # Tear down everything
 
 Environment:
   REGISTRY       Container registry (default: quay.io/kubealex)
   VM_FRONTEND    Frontend VM hostname (prompted if not set)
   VM_BACKEND     Backend VM hostname (prompted if not set)
   VM_DB          Database VM hostname (prompted if not set)
+  SUBNET         Libvirt network subnet (prompted if not set)
   VM_USER        SSH user (default: bootc-user)
+  VM_VCPUS       vCPUs per VM (default: 2)
+  VM_RAM         RAM in MiB per VM (default: 4096)
+  VM_DISK        Disk size in GiB per VM (default: 20)
 EOF
   exit 0
 }
@@ -342,6 +547,11 @@ ACT="${1:-}"
 STEP="${2:-all}"
 
 case "$ACT" in
+  infra)
+    setup_network; pause
+    setup_pool; pause
+    provision_vms
+    ;;
   1)
     [[ "$STEP" == "all" || "$STEP" == "build" ]] && act1_build_baseos
     [[ "$STEP" == "all" ]] && pause
@@ -372,6 +582,9 @@ case "$ACT" in
   all)
     act1_build_baseos; pause
     act1_convert_qcow2; pause
+    setup_network; pause
+    setup_pool; pause
+    provision_vms; pause
     act2_build_db; pause
     act2_deploy_db; pause
     act3_build_apps; pause
@@ -382,6 +595,9 @@ case "$ACT" in
     act5_build_v11; pause
     act5_switch_vms
     banner "Demo complete!"
+    ;;
+  cleanup)
+    cleanup
     ;;
   --help|-h) usage ;;
   *) echo "Unknown act: $ACT"; usage ;;
