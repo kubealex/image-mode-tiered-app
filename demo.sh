@@ -328,6 +328,18 @@ cleanup() {
   sudo virsh net-destroy "${NETWORK_NAME}" 2>/dev/null || true
   sudo virsh net-undefine "${NETWORK_NAME}" 2>/dev/null || true
 
+  step "Removing qcow2 images from ${VM_IMAGES_DIR}/"
+  rm -rf "$VM_IMAGES_DIR"
+
+  step "Removing container images"
+  for img in \
+    "${REGISTRY}/image-mode-baseos" \
+    "${REGISTRY}/image-mode-db" \
+    "${REGISTRY}/image-mode-backend" \
+    "${REGISTRY}/image-mode-frontend"; do
+    podman rmi --all --force "$img" 2>/dev/null || true
+  done
+
   step "Removing config file"
   rm -f "$CONFIG_FILE"
 
