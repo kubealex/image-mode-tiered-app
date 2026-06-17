@@ -4,18 +4,29 @@ set -euo pipefail
 REGISTRY=${REGISTRY:-quay.io/kubealex}
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# VM hostnames — adjust to match your environment
-VM_FRONTEND=${VM_FRONTEND:-vm-frontend}
-VM_BACKEND=${VM_BACKEND:-vm-backend}
-VM_DB=${VM_DB:-vm-db}
-VM_USER=${VM_USER:-bootc-user}
-
 BOLD='\033[1m'
 DIM='\033[2m'
 CYAN='\033[36m'
 GREEN='\033[32m'
 YELLOW='\033[33m'
 RESET='\033[0m'
+
+# VM hostnames — prompt if not set via environment
+if [[ -z "${VM_DB:-}" || -z "${VM_BACKEND:-}" || -z "${VM_FRONTEND:-}" ]]; then
+  echo -e "${BOLD}${CYAN}VM Hostname Configuration${RESET}"
+  echo ""
+  if [[ -z "${VM_DB:-}" ]]; then
+    read -r -p "  Database VM hostname: " VM_DB
+  fi
+  if [[ -z "${VM_BACKEND:-}" ]]; then
+    read -r -p "  Backend VM hostname:  " VM_BACKEND
+  fi
+  if [[ -z "${VM_FRONTEND:-}" ]]; then
+    read -r -p "  Frontend VM hostname: " VM_FRONTEND
+  fi
+  echo ""
+fi
+VM_USER=${VM_USER:-bootc-user}
 
 banner() {
   echo ""
@@ -73,7 +84,7 @@ act1_convert_qcow2() {
     --security-opt label=type:unconfined_t \
     -v "$SCRIPT_DIR/output:/output" \
     -v /var/lib/containers/storage:/var/lib/containers/storage \
-    quay.io/centos-bootc/bootc-image-builder:latest \
+    registry.redhat.io/rhel10/bootc-image-builder:latest \
     --type qcow2 \
     "${REGISTRY}/image-mode-baseos:rhel10.1"
 
@@ -317,9 +328,9 @@ Examples:
 
 Environment:
   REGISTRY       Container registry (default: quay.io/kubealex)
-  VM_FRONTEND    Frontend VM hostname (default: vm-frontend)
-  VM_BACKEND     Backend VM hostname (default: vm-backend)
-  VM_DB          Database VM hostname (default: vm-db)
+  VM_FRONTEND    Frontend VM hostname (prompted if not set)
+  VM_BACKEND     Backend VM hostname (prompted if not set)
+  VM_DB          Database VM hostname (prompted if not set)
   VM_USER        SSH user (default: bootc-user)
 EOF
   exit 0
