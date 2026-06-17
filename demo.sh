@@ -198,15 +198,6 @@ setup_pool() {
   sudo virsh pool-start "${pool_name}"
   sudo virsh pool-autostart "${pool_name}"
 
-  step "Copying VM images to pool"
-  for img in "$VM_IMAGES_DIR"/*.qcow2; do
-    local fname
-    fname=$(basename "$img")
-    sudo cp "$img" "${pool_path}/${fname}"
-    sudo virsh pool-refresh "${pool_name}"
-    info "  ${fname} → ${pool_path}/${fname}"
-  done
-
   echo ""
   step "Storage pool ${pool_name} is ready"
 }
@@ -222,10 +213,21 @@ create_vm() {
   local pool_name="demo-${DOMAIN//./-}"
   local pool_path="/var/lib/libvirt/images/${DOMAIN}"
   local disk="${pool_path}/${vm_short}.qcow2"
-  local cloudinit_dir
-  cloudinit_dir=$(mktemp -d)
+
+  local src_img
+  src_img=$(ls -t "$VM_IMAGES_DIR"/*.qcow2 2>/dev/null | head -1)
+  if [[ -z "$src_img" ]]; then
+    echo -e "${RED}Error: no qcow2 image found in ${VM_IMAGES_DIR}/. Run Act 1 first.${RESET}" >&2
+    return 1
+  fi
 
   step "Creating VM: ${vm_short} (${fqdn})"
+  sudo cp "$src_img" "$disk"
+  sudo virsh pool-refresh "${pool_name}"
+  info "  ${src_img##*/} → ${disk}"
+
+  local cloudinit_dir
+  cloudinit_dir=$(mktemp -d)
 
   cat > "${cloudinit_dir}/meta-data" <<META
 instance-id: ${vm_short}
@@ -360,15 +362,15 @@ act1_convert_qcow2() {
     "${REGISTRY}/image-mode-baseos:rhel10.1"
 
   mkdir -p "$VM_IMAGES_DIR"
-  for vm_short in "${VM_DB_SHORT}" "${VM_BACKEND_SHORT}" "${VM_FRONTEND_SHORT}"; do
-    cp "$SCRIPT_DIR/output/qcow2/disk.qcow2" "$VM_IMAGES_DIR/${vm_short}.qcow2"
-    step "Created ${VM_IMAGES_DIR}/${vm_short}.qcow2"
-  done
+  local timestamp
+  timestamp=$(date +%Y%m%d-%H%M%S)
+  local img_name="baseos-rhel10.1-${timestamp}.qcow2"
+  cp "$SCRIPT_DIR/output/qcow2/disk.qcow2" "$VM_IMAGES_DIR/${img_name}"
 
   rm -rf "$SCRIPT_DIR/output"
 
   echo ""
-  step "qcow2 images ready in ${VM_IMAGES_DIR}/"
+  step "qcow2 image saved: ${VM_IMAGES_DIR}/${img_name}"
 }
 
 # ─────────────────────────────────────────────────────────────
