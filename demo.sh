@@ -237,6 +237,10 @@ META
 hostname: ${vm_short}
 fqdn: ${fqdn}
 manage_etc_hosts: true
+power_state:
+  mode: reboot
+  message: "Rebooting to register hostname with DHCP"
+  condition: true
 USERDATA
 
   local cloudinit_iso="${pool_path}/${vm_short}-cloudinit.iso"
@@ -591,8 +595,8 @@ Run the demo step by step. Each act can be run independently.
 Configuration is prompted on first use and saved to .demo-config.
 
 Acts:
-  infra   Set up libvirt network, pool, and provision VMs
-  1       Act 1 — Operations: Base OS (RHEL 10.1)
+  infra   Set up libvirt network and storage pool
+  1       Act 1 — Operations: Base OS (RHEL 10.1), qcow2, provision VMs
   2       Act 2 — DB team: Deploy PostgreSQL
   3       Act 3 — App team: Deploy frontend + backend (v1.0)
   4       Act 4 — OS upgrade to RHEL 10.2 (soft reboot)
@@ -611,8 +615,8 @@ Defaults:
   Frontend: im-train.demo.lab
 
 Examples:
-  $0 infra            # Set up network, pool, provision VMs
-  $0 1                # Full Act 1 (build + qcow2)
+  $0 infra            # Set up network and storage pool
+  $0 1                # Full Act 1 (build + qcow2 + provision VMs)
   $0 2 build          # Act 2 build only
   $0 3 deploy         # Act 3 VM commands only
   $0 all              # Full demo
@@ -636,13 +640,14 @@ STEP="${2:-all}"
 case "$ACT" in
   infra)
     setup_network; pause
-    setup_pool; pause
-    provision_vms
+    setup_pool
     ;;
   1)
     [[ "$STEP" == "all" || "$STEP" == "build" ]] && act1_build_baseos
     [[ "$STEP" == "all" ]] && pause
     [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act1_convert_qcow2
+    [[ "$STEP" == "all" ]] && pause
+    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && provision_vms
     ;;
   2)
     [[ "$STEP" == "all" || "$STEP" == "build" ]] && act2_build_db
@@ -667,10 +672,10 @@ case "$ACT" in
     [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act5_switch_vms
     ;;
   all)
-    act1_build_baseos; pause
-    act1_convert_qcow2; pause
     setup_network; pause
     setup_pool; pause
+    act1_build_baseos; pause
+    act1_convert_qcow2; pause
     provision_vms; pause
     act2_build_db; pause
     act2_deploy_db; pause
