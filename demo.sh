@@ -183,7 +183,19 @@ manage_etc_hosts: true
 USERDATA
 
   local cloudinit_iso="${pool_path}/${vm_short}-cloudinit.iso"
-  sudo genisoimage -output "${cloudinit_iso}" \
+  local mkiso_cmd=""
+  for cmd in genisoimage mkisofs xorrisofs; do
+    if command -v "$cmd" &>/dev/null; then
+      mkiso_cmd="$cmd"
+      break
+    fi
+  done
+  if [[ -z "$mkiso_cmd" ]]; then
+    echo -e "${RED}Error: no ISO tool found. Install genisoimage, mkisofs, or xorrisofs.${RESET}" >&2
+    rm -rf "${cloudinit_dir}"
+    return 1
+  fi
+  sudo "${mkiso_cmd}" -output "${cloudinit_iso}" \
     -volid cidata -joliet -rock \
     "${cloudinit_dir}/meta-data" "${cloudinit_dir}/user-data"
   rm -rf "${cloudinit_dir}"
