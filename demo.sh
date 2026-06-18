@@ -63,6 +63,13 @@ submodule_save_ref() {
   git -C "$1" symbolic-ref --quiet HEAD 2>/dev/null || git -C "$1" rev-parse HEAD
 }
 
+submodule_checkout() {
+  local dir="$1" branch="$2"
+  git -C "$dir" fetch origin --quiet
+  git -C "$dir" checkout "$branch" --quiet 2>/dev/null
+  git -C "$dir" reset --hard "origin/$branch" --quiet
+}
+
 submodule_restore_ref() {
   local dir="$1" ref="$2"
   git -C "$dir" checkout "${ref#refs/heads/}" --quiet 2>/dev/null
@@ -403,7 +410,7 @@ act1_build_baseos() {
 
   step "Building baseos:rhel10.1"
   cd "$SCRIPT_DIR/baseos"
-  git checkout rhel10.1 --quiet
+  submodule_checkout . rhel10.1
   podman build -t "${REGISTRY}/image-mode-baseos:rhel10.1" .
   podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
 
@@ -455,7 +462,7 @@ act2_build_db() {
 
   step "Building image-mode-db:pg16"
   cd "$SCRIPT_DIR/db"
-  git checkout pg16 --quiet
+  submodule_checkout . pg16
   podman build -t "${REGISTRY}/image-mode-db:pg16" .
 
   step "Pushing image-mode-db:pg16"
@@ -496,7 +503,7 @@ act3_build_apps() {
 
   step "Building image-mode-backend:v1.0"
   cd "$SCRIPT_DIR/backend"
-  git checkout v1.0 --quiet
+  submodule_checkout . v1.0
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.0" .
@@ -506,7 +513,7 @@ act3_build_apps() {
 
   step "Building image-mode-frontend:v1.0"
   cd "$SCRIPT_DIR/frontend"
-  git checkout v1.0 --quiet
+  submodule_checkout . v1.0
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.0" .
@@ -551,7 +558,7 @@ act4_build_baseos() {
 
   step "Building baseos:rhel10.2"
   cd "$SCRIPT_DIR/baseos"
-  git checkout rhel10.2 --quiet
+  submodule_checkout . rhel10.2
   podman build -t "${REGISTRY}/image-mode-baseos:rhel10.2" .
   podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
 
@@ -576,13 +583,13 @@ act4_rebuild_all() {
 
   step "DB team: Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/db"
-  git checkout pg16 --quiet
+  submodule_checkout . pg16
   podman build -t "${REGISTRY}/image-mode-db:pg16" .
   podman push "${REGISTRY}/image-mode-db:pg16"
 
   step "App team: Rebuilding image-mode-backend:v1.0 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/backend"
-  git checkout v1.0 --quiet
+  submodule_checkout . v1.0
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.0" .
@@ -590,7 +597,7 @@ act4_rebuild_all() {
 
   step "App team: Rebuilding image-mode-frontend:v1.0 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/frontend"
-  git checkout v1.0 --quiet
+  submodule_checkout . v1.0
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.0" .
@@ -642,7 +649,7 @@ act5_build_v11() {
 
   step "Building image-mode-backend:v1.1"
   cd "$SCRIPT_DIR/backend"
-  git checkout v1.1 --quiet
+  submodule_checkout . v1.1
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.1" .
@@ -652,7 +659,7 @@ act5_build_v11() {
 
   step "Building image-mode-frontend:v1.1"
   cd "$SCRIPT_DIR/frontend"
-  git checkout v1.1 --quiet
+  submodule_checkout . v1.1
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.1" .
