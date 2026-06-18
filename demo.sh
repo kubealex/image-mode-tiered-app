@@ -127,7 +127,7 @@ ensure_infra_config() {
 }
 
 _derive_names() {
-  NETWORK_NAME="demo-${DOMAIN//./-}"
+  NETWORK_NAME="${DOMAIN}"
   VM_USER=${VM_USER:-bootc-user}
 }
 
@@ -197,7 +197,7 @@ setup_pool() {
   ensure_infra_config
   banner "Infrastructure: Configure libvirt storage pool"
 
-  local pool_name="demo-${DOMAIN//./-}"
+  local pool_name="${DOMAIN}"
   local pool_path="/var/lib/libvirt/images/${DOMAIN}"
 
   step "Creating storage pool: ${pool_name} at ${pool_path}"
@@ -219,7 +219,7 @@ create_vm() {
   local vm_short
   vm_short=$(short_name "$fqdn")
 
-  local pool_name="demo-${DOMAIN//./-}"
+  local pool_name="${DOMAIN}"
   local pool_path="/var/lib/libvirt/images/${DOMAIN}"
   local disk="${pool_path}/${vm_short}.qcow2"
 
@@ -310,7 +310,7 @@ cleanup() {
   ensure_vm_config
   banner "Cleanup: Destroying demo environment"
 
-  local pool_name="demo-${DOMAIN//./-}"
+  local pool_name="${DOMAIN}"
   local pool_path="/var/lib/libvirt/images/${DOMAIN}"
 
   for vm_short in "${VM_DB_SHORT}" "${VM_BACKEND_SHORT}" "${VM_FRONTEND_SHORT}"; do
