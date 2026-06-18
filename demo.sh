@@ -186,6 +186,12 @@ NETXML
   sudo virsh net-autostart "${NETWORK_NAME}"
   rm -f "$net_xml"
 
+  step "Adding DNS forwarding rule (DNAT to ${subnet_gw}:53)"
+  sudo iptables -t nat -A PREROUTING -p udp --dport 53 -d "$(hostname -I | awk '{print $1}')" \
+    -j DNAT --to-destination "${subnet_gw}:53"
+  sudo iptables -t nat -A PREROUTING -p tcp --dport 53 -d "$(hostname -I | awk '{print $1}')" \
+    -j DNAT --to-destination "${subnet_gw}:53"
+
   echo ""
   step "Network ${NETWORK_NAME} is active with DNS for ${DOMAIN}"
 }
@@ -325,6 +331,16 @@ cleanup() {
   sudo virsh pool-destroy "${pool_name}" 2>/dev/null || true
   sudo virsh pool-undefine "${pool_name}" 2>/dev/null || true
   sudo rm -rf "${pool_path}" 2>/dev/null || true
+
+  step "Removing DNS forwarding rules"
+  local host_ip subnet_base subnet_gw
+  host_ip=$(hostname -I | awk '{print $1}')
+  subnet_base="${SUBNET%%/*}"
+  subnet_gw="${subnet_base%.*}.1"
+  sudo iptables -t nat -D PREROUTING -p udp --dport 53 -d "${host_ip}" \
+    -j DNAT --to-destination "${subnet_gw}:53" 2>/dev/null || true
+  sudo iptables -t nat -D PREROUTING -p tcp --dport 53 -d "${host_ip}" \
+    -j DNAT --to-destination "${subnet_gw}:53" 2>/dev/null || true
 
   step "Removing network: ${NETWORK_NAME}"
   sudo virsh net-destroy "${NETWORK_NAME}" 2>/dev/null || true
