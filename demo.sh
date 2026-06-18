@@ -67,7 +67,9 @@ submodule_checkout() {
   local dir="$1" branch="$2"
   git -C "$dir" fetch origin --quiet
   git -C "$dir" checkout "$branch" --quiet 2>/dev/null
-  git -C "$dir" reset --hard "origin/$branch" --quiet
+  if git -C "$dir" rev-parse --verify "origin/$branch" &>/dev/null; then
+    git -C "$dir" reset --hard "origin/$branch" --quiet
+  fi
 }
 
 submodule_restore_ref() {
