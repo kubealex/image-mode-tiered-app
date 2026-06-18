@@ -304,6 +304,15 @@ provision_vms() {
   ensure_infra_config
   banner "Infrastructure: Provision VMs"
 
+  if ! sudo virsh net-info "${NETWORK_NAME}" &>/dev/null; then
+    echo -e "${RED}Error: libvirt network '${NETWORK_NAME}' not found. Run '$0 infra' first.${RESET}" >&2
+    return 1
+  fi
+  if ! sudo virsh pool-info "${DOMAIN}" &>/dev/null; then
+    echo -e "${RED}Error: libvirt storage pool '${DOMAIN}' not found. Run '$0 infra' first.${RESET}" >&2
+    return 1
+  fi
+
   create_vm "${VM_DB}"
   create_vm "${VM_BACKEND}"
   create_vm "${VM_FRONTEND}"
