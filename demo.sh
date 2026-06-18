@@ -684,8 +684,9 @@ Acts:
   cleanup Destroy all VMs, storage pool, network, and config
 
 Steps (optional, for acts 1-5):
-  build   Build and push images only
-  deploy  Show VM deployment commands only
+  build     Build and push images only
+  deploy    Convert qcow2 + provision VMs (act 1) or deploy to VMs
+  provision Provision VMs only (act 1, skips qcow2 conversion)
 
 Defaults:
   Domain:   demo.lab
@@ -726,7 +727,7 @@ case "$ACT" in
     [[ "$STEP" == "all" ]] && pause
     [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act1_convert_qcow2
     [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && provision_vms
+    [[ "$STEP" == "all" || "$STEP" == "deploy" || "$STEP" == "provision" ]] && provision_vms
     ;;
   2)
     [[ "$STEP" == "all" || "$STEP" == "build" ]] && act2_build_db
