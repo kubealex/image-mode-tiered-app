@@ -162,10 +162,14 @@ setup_network() {
   info "DHCP range: ${dhcp_start} – ${dhcp_end}"
   info "DNS domain: ${DOMAIN}"
 
+  local host_ip host_iface
+  host_ip=$(hostname -I | awk '{print $1}')
+  host_iface=$(ip route show default | awk '{print $5; exit}')
+
   local net_xml
   net_xml=$(mktemp)
   cat > "$net_xml" <<NETXML
-<network>
+<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>
   <name>${NETWORK_NAME}</name>
   <forward mode='nat'/>
   <bridge stp='on' delay='0'/>
@@ -178,8 +182,14 @@ setup_network() {
       <range start='${dhcp_start}' end='${dhcp_end}'/>
     </dhcp>
   </ip>
+  <dnsmasq:options>
+    <dnsmasq:option value='interface=${host_iface}'/>
+    <dnsmasq:option value='listen-address=${host_ip}'/>
+  </dnsmasq:options>
 </network>
 NETXML
+
+  info "dnsmasq bound to ${host_iface} (${host_ip}) for external DNS resolution"
 
   sudo virsh net-define "$net_xml"
   sudo virsh net-start "${NETWORK_NAME}"
@@ -187,8 +197,6 @@ NETXML
   rm -f "$net_xml"
 
   step "Adding DNS forwarding rules (DNAT to ${subnet_gw}:53)"
-  local host_ip
-  host_ip=$(hostname -I | awk '{print $1}')
   sudo iptables -t nat -A PREROUTING -p udp --dport 53 -d "${host_ip}" \
     -j DNAT --to-destination "${subnet_gw}:53"
   sudo iptables -t nat -A PREROUTING -p tcp --dport 53 -d "${host_ip}" \
