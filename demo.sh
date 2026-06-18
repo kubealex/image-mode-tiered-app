@@ -247,26 +247,11 @@ instance-id: ${vm_short}
 local-hostname: ${fqdn}
 META
 
-  local ssh_pubkey=""
-  for keyfile in ~/.ssh/id_ed25519.pub ~/.ssh/id_rsa.pub ~/.ssh/id_ecdsa.pub; do
-    if [[ -f "$keyfile" ]]; then
-      ssh_pubkey=$(cat "$keyfile")
-      break
-    fi
-  done
-
   cat > "${cloudinit_dir}/user-data" <<USERDATA
 #cloud-config
 hostname: ${vm_short}
 fqdn: ${fqdn}
 manage_etc_hosts: true
-users:
-  - name: ${VM_USER}
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: wheel
-    lock_passwd: true
-${ssh_pubkey:+    ssh_authorized_keys:
-      - ${ssh_pubkey}}
 power_state:
   mode: reboot
   message: "Rebooting to register hostname with DHCP"
