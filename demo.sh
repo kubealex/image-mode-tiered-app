@@ -169,7 +169,7 @@ setup_network() {
   <name>${NETWORK_NAME}</name>
   <forward mode='nat'/>
   <bridge stp='on' delay='0'/>
-  <domain name='${DOMAIN}' localOnly='yes' register='yes'/>
+  <domain name='${DOMAIN}' localOnly='yes'/>
   <dns forwardPlainNames='yes'>
     <forwarder domain='${DOMAIN}'/>
   </dns>
