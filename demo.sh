@@ -230,7 +230,7 @@ create_vm() {
   local disk="${pool_path}/${vm_short}.qcow2"
 
   local src_img
-  src_img=$(ls -t "$VM_IMAGES_DIR"/*.qcow2 2>/dev/null | head -1)
+  src_img=$(ls -t "$VM_IMAGES_DIR"/*.qcow2 2>/dev/null | head -1) || true
   if [[ -z "$src_img" ]]; then
     echo -e "${RED}Error: no qcow2 image found in ${VM_IMAGES_DIR}/. Run Act 1 first.${RESET}" >&2
     return 1
