@@ -231,9 +231,12 @@ create_vm() {
   fi
 
   step "Creating VM: ${vm_short} (${fqdn})"
+  sudo mkdir -p "${pool_path}"
   sudo cp "$src_img" "$disk"
   sudo qemu-img resize "${disk}" "${VM_DISK}G"
-  sudo virsh pool-refresh "${pool_name}"
+  if sudo virsh pool-info "${pool_name}" &>/dev/null; then
+    sudo virsh pool-refresh "${pool_name}"
+  fi
   info "  ${src_img##*/} → ${disk}"
 
   local cloudinit_dir
