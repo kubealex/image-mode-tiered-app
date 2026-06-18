@@ -169,8 +169,8 @@ setup_network() {
   <name>${NETWORK_NAME}</name>
   <forward mode='nat'/>
   <bridge stp='on' delay='0'/>
-  <domain name='${DOMAIN}' localOnly='yes'/>
-  <dns>
+  <domain name='${DOMAIN}'/>
+  <dns forwardPlainNames='yes'>
     <forwarder domain='${DOMAIN}'/>
   </dns>
   <ip address='${subnet_gw}' netmask='255.255.255.0'>
