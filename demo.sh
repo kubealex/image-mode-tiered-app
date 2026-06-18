@@ -421,7 +421,8 @@ act1_build_baseos() {
   podman push "${REGISTRY}/image-mode-baseos:latest"
 
   step "Re-pulling from registry (compressed layers for bootc)"
-  podman rmi "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
+  podman rmi --force "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true
+  podman system prune --all --force >/dev/null
   podman pull "${REGISTRY}/image-mode-baseos:rhel10.1"
   podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
 
@@ -574,7 +575,8 @@ act4_build_baseos() {
   podman push "${REGISTRY}/image-mode-baseos:latest"
 
   step "Re-pulling from registry (compressed layers for bootc)"
-  podman rmi "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
+  podman rmi --force "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true
+  podman system prune --all --force >/dev/null
   podman pull "${REGISTRY}/image-mode-baseos:rhel10.2"
   podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
 
