@@ -232,6 +232,7 @@ create_vm() {
 
   step "Creating VM: ${vm_short} (${fqdn})"
   sudo cp "$src_img" "$disk"
+  sudo qemu-img resize "${disk}" "${VM_DISK}G"
   sudo virsh pool-refresh "${pool_name}"
   info "  ${src_img##*/} → ${disk}"
 
@@ -271,8 +272,6 @@ USERDATA
     -volid cidata -joliet -rock \
     "${cloudinit_dir}/meta-data" "${cloudinit_dir}/user-data"
   rm -rf "${cloudinit_dir}"
-
-  sudo qemu-img resize "${disk}" "${VM_DISK}G"
 
   sudo virt-install \
     --name "${vm_short}" \
