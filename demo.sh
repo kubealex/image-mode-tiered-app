@@ -183,9 +183,6 @@ setup_network() {
   <forward mode='nat'/>
   <bridge stp='on' delay='0'/>
   <domain name='${DOMAIN}' localOnly='yes'/>
-  <dns forwardPlainNames='yes'>
-    <forwarder domain='${DOMAIN}'/>
-  </dns>
   <ip address='${subnet_gw}' netmask='255.255.255.0'>
     <dhcp>
       <range start='${dhcp_start}' end='${dhcp_end}'/>
