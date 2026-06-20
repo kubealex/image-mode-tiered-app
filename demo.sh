@@ -686,7 +686,7 @@ step5a_upgrade_vms() {
 # ─────────────────────────────────────────────────────────────
 # Step 5b — Day 2: App release v1.1 (on RHEL 10.1)
 #   Starting state: RHEL 10.1, apps v1.0
-#   Build new app version with new tags → bootc update --tag
+#   Build new app version with new tags → bootc switch (10.1 lacks --tag)
 # ─────────────────────────────────────────────────────────────
 step5b_build_apps() {
   ensure_vm_config
@@ -727,15 +727,15 @@ step5b_update_vms() {
   ensure_vm_config
   banner "Step 5b — App Release: Update VMs to v1.1"
 
-  info "The image tag changes (v1.0 → v1.1) — use bootc update --tag."
+  info "RHEL 10.1 does not support bootc update --tag — use bootc switch to the new image tag."
   echo ""
 
-  step "Update backend VM to v1.1"
-  vm_cmd "${VM_BACKEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
+  step "Switch backend VM to v1.1"
+  vm_cmd "${VM_BACKEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-backend:v1.1"
   echo ""
 
-  step "Update frontend VM to v1.1"
-  vm_cmd "${VM_FRONTEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
+  step "Switch frontend VM to v1.1"
+  vm_cmd "${VM_FRONTEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-frontend:v1.1"
   echo ""
 
   step "Verify after soft reboot:"
@@ -833,7 +833,7 @@ usage() {
   echo "  5a           OS upgrade: rebuild everything on RHEL 10.2, same tags"
   echo "               VMs run: bootc upgrade --apply --soft-reboot=auto"
   echo "  5b           App release: build v1.1 on RHEL 10.1, new tags"
-  echo "               VMs run: bootc update --tag v1.1 --apply --soft-reboot=auto"
+  echo "               VMs run: bootc switch --apply --soft-reboot=auto IMAGE:v1.1"
   echo "  5c           Combined: build v1.1 on RHEL 10.2 (run after 5a)"
   echo "               VMs run: bootc update --tag v1.1 --apply --soft-reboot=auto"
   echo ""
