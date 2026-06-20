@@ -495,7 +495,7 @@ step3_build_db() {
   step "Building image-mode-db:pg16"
   cd "$SCRIPT_DIR/db"
   submodule_checkout . pg16
-  podman build --pull=always -t "${REGISTRY}/image-mode-db:pg16" .
+  podman build -t "${REGISTRY}/image-mode-db:pg16" .
   podman tag "${REGISTRY}/image-mode-db:pg16" "${REGISTRY}/image-mode-db:pg16-rhel10.1"
 
   step "Pushing image-mode-db:pg16 + pg16-rhel10.1"
@@ -537,7 +537,7 @@ step4_build_apps() {
   step "Building image-mode-backend:v1.0"
   cd "$SCRIPT_DIR/backend"
   submodule_checkout . v1.0
-  podman build --pull=always \
+  podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.0" .
   podman tag "${REGISTRY}/image-mode-backend:v1.0" "${REGISTRY}/image-mode-backend:v1.0-rhel10.1"
@@ -549,7 +549,7 @@ step4_build_apps() {
   step "Building image-mode-frontend:v1.0"
   cd "$SCRIPT_DIR/frontend"
   submodule_checkout . v1.0
-  podman build --pull=always \
+  podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.0" .
   podman tag "${REGISTRY}/image-mode-frontend:v1.0" "${REGISTRY}/image-mode-frontend:v1.0-rhel10.1"
@@ -591,6 +591,9 @@ step5a_build_apps() {
   ensure_vm_config
   banner "Step 5a — App Release: Build Apps v1.1 (on RHEL 10.1)"
 
+  step "Ensuring baseos:latest points to RHEL 10.1"
+  podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
+
   local saved_backend saved_frontend
   saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
   saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
@@ -598,7 +601,7 @@ step5a_build_apps() {
   step "Building image-mode-backend:v1.1"
   cd "$SCRIPT_DIR/backend"
   submodule_checkout . v1.1
-  podman build --pull=always \
+  podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.1" .
   podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
@@ -610,7 +613,7 @@ step5a_build_apps() {
   step "Building image-mode-frontend:v1.1"
   cd "$SCRIPT_DIR/frontend"
   submodule_checkout . v1.1
-  podman build --pull=always \
+  podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.1" .
   podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
@@ -707,6 +710,9 @@ step5b_build_baseos() {
 step5c_rebuild_all() {
   ensure_vm_config
   banner "Step 5c — Rebuild all images on RHEL 10.2"
+
+  step "Ensuring baseos:latest points to RHEL 10.2"
+  podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
 
   local saved_db saved_backend saved_frontend
   saved_db=$(submodule_save_ref "$SCRIPT_DIR/db")
