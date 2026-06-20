@@ -252,7 +252,7 @@ create_vm() {
   local src_img
   src_img=$(ls -t "$VM_IMAGES_DIR"/*.qcow2 2>/dev/null | head -1) || true
   if [[ -z "$src_img" ]]; then
-    echo -e "${RED}Error: no qcow2 image found in ${VM_IMAGES_DIR}/. Run Act 1 first.${RESET}" >&2
+    echo -e "${RED}Error: no qcow2 image found in ${VM_IMAGES_DIR}/. Run step 1 first.${RESET}" >&2
     return 1
   fi
 
@@ -318,7 +318,7 @@ USERDATA
 
 provision_vms() {
   ensure_infra_config
-  banner "Infrastructure: Provision VMs"
+  banner "Step 2 — Deploy VMs: Provision"
 
   if ! sudo virsh net-info "${NETWORK_NAME}" &>/dev/null; then
     echo -e "${RED}Error: libvirt network '${NETWORK_NAME}' not found. Run '$0 infra' first.${RESET}" >&2
@@ -399,10 +399,10 @@ cleanup() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Act 1 — Operations: Base OS (RHEL 10.1)
+# Step 1 — Build Base OS (RHEL 10.1)
 # ─────────────────────────────────────────────────────────────
-act1_build_baseos() {
-  banner "Act 1 — Operations: Build Base OS (RHEL 10.1)"
+step1_build_baseos() {
+  banner "Step 1 — Build Base OS (RHEL 10.1)"
 
   local saved_ref
   saved_ref=$(submodule_save_ref "$SCRIPT_DIR/baseos")
@@ -429,9 +429,12 @@ act1_build_baseos() {
   step "baseos:latest now points to RHEL 10.1 on ${REGISTRY}"
 }
 
-act1_convert_qcow2() {
+# ─────────────────────────────────────────────────────────────
+# Step 2 — Convert to qcow2 and deploy VMs
+# ─────────────────────────────────────────────────────────────
+step2_convert_qcow2() {
   ensure_vm_config
-  banner "Act 1 — Operations: Convert to qcow2"
+  banner "Step 2 — Deploy VMs: Convert to qcow2"
 
   step "Converting baseos:rhel10.1 to qcow2 using bootc-image-builder"
   mkdir -p "$SCRIPT_DIR/output"
@@ -457,10 +460,10 @@ act1_convert_qcow2() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Act 2 — DB team: Deploy PostgreSQL
+# Step 3 — Build and deploy database (PostgreSQL)
 # ─────────────────────────────────────────────────────────────
-act2_build_db() {
-  banner "Act 2 — DB team: Build and push database image"
+step3_build_db() {
+  banner "Step 3 — Build Database Image (PostgreSQL)"
 
   local saved_ref
   saved_ref=$(submodule_save_ref "$SCRIPT_DIR/db")
@@ -479,28 +482,27 @@ act2_build_db() {
   step "Database image ready on ${REGISTRY}"
 }
 
-act2_deploy_db() {
+step3_deploy_db() {
   ensure_vm_config
-  banner "Act 2 — DB team: Deploy on VM"
+  banner "Step 3 — Deploy Database on VM"
 
-  step "Switch the db VM to the database image"
-  vm_cmd "${VM_DB}" "sudo bootc switch ${REGISTRY}/image-mode-db:pg16"
-  vm_cmd "${VM_DB}" "sudo systemctl reboot"
+  step "Switch the DB VM to the database image"
+  vm_cmd "${VM_DB}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-db:pg16"
   echo ""
   info "After reboot, PostgreSQL initializes automatically."
   echo ""
 
-  step "Run on the db VM to verify:"
+  step "Run on the DB VM to verify:"
   vm_cmd "${VM_DB}" "sudo systemctl status train-tickets-db"
   vm_cmd "${VM_DB}" "sudo -u postgres psql -d train_tickets -c 'SELECT count(*) FROM stations;'"
 }
 
 # ─────────────────────────────────────────────────────────────
-# Act 3 — App team: Deploy frontend + backend (v1.0)
+# Step 4 — Build and deploy apps v1.0
 # ─────────────────────────────────────────────────────────────
-act3_build_apps() {
+step4_build_apps() {
   ensure_vm_config
-  banner "Act 3 — App team: Build and push v1.0"
+  banner "Step 4 — Build Apps v1.0 (Backend + Frontend)"
 
   local saved_backend saved_frontend
   saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
@@ -533,18 +535,16 @@ act3_build_apps() {
   step "App images v1.0 ready on ${REGISTRY}"
 }
 
-act3_deploy_apps() {
+step4_deploy_apps() {
   ensure_vm_config
-  banner "Act 3 — App team: Deploy on VMs"
+  banner "Step 4 — Deploy Apps v1.0 on VMs"
 
-  step "Switch the backend VM"
-  vm_cmd "${VM_BACKEND}" "sudo bootc switch ${REGISTRY}/image-mode-backend:v1.0"
-  vm_cmd "${VM_BACKEND}" "sudo systemctl reboot"
+  step "Switch the backend VM to v1.0"
+  vm_cmd "${VM_BACKEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-backend:v1.0"
   echo ""
 
-  step "Switch the frontend VM"
-  vm_cmd "${VM_FRONTEND}" "sudo bootc switch ${REGISTRY}/image-mode-frontend:v1.0"
-  vm_cmd "${VM_FRONTEND}" "sudo systemctl reboot"
+  step "Switch the frontend VM to v1.0"
+  vm_cmd "${VM_FRONTEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-frontend:v1.0"
   echo ""
 
   step "Verify after reboot:"
@@ -553,10 +553,12 @@ act3_deploy_apps() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Act 4 — OS upgrade to RHEL 10.2
+# Step 5a — Day 2: OS upgrade (RHEL 10.1 → 10.2)
+#   Starting state: RHEL 10.1, apps v1.0
+#   Rebuild all images on new base OS, same tags → bootc upgrade
 # ─────────────────────────────────────────────────────────────
-act4_build_baseos() {
-  banner "Act 4 — Operations: Build baseos RHEL 10.2"
+step5a_build_baseos() {
+  banner "Step 5a — OS Upgrade: Build Base OS (RHEL 10.2)"
 
   local saved_ref
   saved_ref=$(submodule_save_ref "$SCRIPT_DIR/baseos")
@@ -583,22 +585,22 @@ act4_build_baseos() {
   step "baseos:latest now points to RHEL 10.2"
 }
 
-act4_rebuild_all() {
+step5a_rebuild_all() {
   ensure_vm_config
-  banner "Act 4 — All teams: Rebuild on new base OS"
+  banner "Step 5a — OS Upgrade: Rebuild all images on RHEL 10.2"
 
   local saved_db saved_backend saved_frontend
   saved_db=$(submodule_save_ref "$SCRIPT_DIR/db")
   saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
   saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
 
-  step "DB team: Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
+  step "Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/db"
   submodule_checkout . pg16
   podman build -t "${REGISTRY}/image-mode-db:pg16" .
   podman push "${REGISTRY}/image-mode-db:pg16"
 
-  step "App team: Rebuilding image-mode-backend:v1.0 (now on RHEL 10.2)"
+  step "Rebuilding image-mode-backend:v1.0 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/backend"
   submodule_checkout . v1.0
   podman build \
@@ -606,7 +608,7 @@ act4_rebuild_all() {
     -t "${REGISTRY}/image-mode-backend:v1.0" .
   podman push "${REGISTRY}/image-mode-backend:v1.0"
 
-  step "App team: Rebuilding image-mode-frontend:v1.0 (now on RHEL 10.2)"
+  step "Rebuilding image-mode-frontend:v1.0 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/frontend"
   submodule_checkout . v1.0
   podman build \
@@ -619,27 +621,27 @@ act4_rebuild_all() {
   submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
 
   echo ""
-  step "All images rebuilt on RHEL 10.2 base"
+  step "All images rebuilt on RHEL 10.2 base (same tags)"
 }
 
-act4_upgrade_vms() {
+step5a_upgrade_vms() {
   ensure_vm_config
-  banner "Act 4 — Upgrade all VMs (soft reboot)"
+  banner "Step 5a — OS Upgrade: Update all VMs"
 
   info "Each VM pulls the rebuilt image (same tag, new base OS)."
   info "With --soft-reboot=auto, the kernel stays running — downtime in seconds."
   echo ""
 
-  step "Upgrade db VM"
-  vm_cmd "${VM_DB}" "sudo bootc upgrade --soft-reboot=auto --apply"
+  step "Upgrade DB VM"
+  vm_cmd "${VM_DB}" "sudo bootc upgrade --apply --soft-reboot=auto"
   echo ""
 
   step "Upgrade backend VM"
-  vm_cmd "${VM_BACKEND}" "sudo bootc upgrade --soft-reboot=auto --apply"
+  vm_cmd "${VM_BACKEND}" "sudo bootc upgrade --apply --soft-reboot=auto"
   echo ""
 
   step "Upgrade frontend VM"
-  vm_cmd "${VM_FRONTEND}" "sudo bootc upgrade --soft-reboot=auto --apply"
+  vm_cmd "${VM_FRONTEND}" "sudo bootc upgrade --apply --soft-reboot=auto"
   echo ""
 
   step "Verify after soft reboot:"
@@ -648,11 +650,13 @@ act4_upgrade_vms() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Act 5 — App team: Release v1.1 (Timetable feature)
+# Step 5b — Day 2: App release v1.1 (on RHEL 10.1)
+#   Starting state: RHEL 10.1, apps v1.0
+#   Build new app version with new tags → bootc update --tag
 # ─────────────────────────────────────────────────────────────
-act5_build_v11() {
+step5b_build_apps() {
   ensure_vm_config
-  banner "Act 5 — App team: Build and push v1.1"
+  banner "Step 5b — App Release: Build Apps v1.1 (on RHEL 10.1)"
 
   local saved_backend saved_frontend
   saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
@@ -685,19 +689,19 @@ act5_build_v11() {
   step "App images v1.1 ready on ${REGISTRY}"
 }
 
-act5_switch_vms() {
+step5b_update_vms() {
   ensure_vm_config
-  banner "Act 5 — App team: Switch VMs to v1.1 (soft reboot)"
+  banner "Step 5b — App Release: Update VMs to v1.1"
 
-  info "Since the image tag changes (v1.0 → v1.1), we use bootc switch."
+  info "The image tag changes (v1.0 → v1.1) — use bootc update --tag."
   echo ""
 
-  step "Switch backend VM to v1.1"
-  vm_cmd "${VM_BACKEND}" "sudo bootc switch --soft-reboot=auto --apply ${REGISTRY}/image-mode-backend:v1.1"
+  step "Update backend VM to v1.1"
+  vm_cmd "${VM_BACKEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
   echo ""
 
-  step "Switch frontend VM to v1.1"
-  vm_cmd "${VM_FRONTEND}" "sudo bootc switch --soft-reboot=auto --apply ${REGISTRY}/image-mode-frontend:v1.1"
+  step "Update frontend VM to v1.1"
+  vm_cmd "${VM_FRONTEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
   echo ""
 
   step "Verify after soft reboot:"
@@ -709,29 +713,104 @@ act5_switch_vms() {
 }
 
 # ─────────────────────────────────────────────────────────────
+# Step 5c — Day 2: App release v1.1 on RHEL 10.2
+#   Starting state: RHEL 10.2, apps v1.0 (after 5a)
+#   Build new app version on 10.2 base → bootc update --tag
+# ─────────────────────────────────────────────────────────────
+step5c_build_apps() {
+  ensure_vm_config
+  banner "Step 5c — Combined: Build Apps v1.1 (on RHEL 10.2)"
+
+  info "Base OS is already RHEL 10.2 (from step 5a). Building apps v1.1 on top."
+  echo ""
+
+  local saved_backend saved_frontend
+  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
+  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
+
+  step "Building image-mode-backend:v1.1 (on RHEL 10.2 base)"
+  cd "$SCRIPT_DIR/backend"
+  submodule_checkout . v1.1
+  podman build \
+    --build-arg DB_HOST="${VM_DB}" \
+    -t "${REGISTRY}/image-mode-backend:v1.1" .
+
+  step "Pushing image-mode-backend:v1.1"
+  podman push "${REGISTRY}/image-mode-backend:v1.1"
+
+  step "Building image-mode-frontend:v1.1 (on RHEL 10.2 base)"
+  cd "$SCRIPT_DIR/frontend"
+  submodule_checkout . v1.1
+  podman build \
+    --build-arg API_HOST="${VM_BACKEND}" \
+    -t "${REGISTRY}/image-mode-frontend:v1.1" .
+
+  step "Pushing image-mode-frontend:v1.1"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1"
+
+  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
+  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
+
+  echo ""
+  step "App images v1.1 (RHEL 10.2 base) ready on ${REGISTRY}"
+}
+
+step5c_update_vms() {
+  ensure_vm_config
+  banner "Step 5c — Combined: Update VMs to v1.1"
+
+  info "VMs are on RHEL 10.2 / v1.0 (from step 5a). Updating apps to v1.1."
+  echo ""
+
+  step "Update backend VM to v1.1"
+  vm_cmd "${VM_BACKEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
+  echo ""
+
+  step "Update frontend VM to v1.1"
+  vm_cmd "${VM_FRONTEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
+  echo ""
+
+  step "Verify after soft reboot:"
+  vm_cmd "${VM_BACKEND}" "curl http://localhost:3001/api/timetable"
+  info "Expected: Train timetable data (v1.1 on RHEL 10.2)"
+  echo ""
+  vm_cmd "${VM_FRONTEND}" "curl http://localhost:5173/"
+  info "Expected: 200 OK — Timetable page now available in the UI"
+}
+
+# ─────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────
 usage() {
   cat <<EOF
-Usage: $0 <act> [step]
+Usage: $0 <step> [build|deploy]
 
-Run the demo step by step. Each act can be run independently.
+Train Tickets image-mode demo — build, deploy, and upgrade bootc VMs.
 Configuration is prompted on first use and saved to .demo-config.
 
-Acts:
-  infra   Set up libvirt network and storage pool
-  1       Act 1 — Operations: Base OS (RHEL 10.1), qcow2, provision VMs
-  2       Act 2 — DB team: Deploy PostgreSQL
-  3       Act 3 — App team: Deploy frontend + backend (v1.0)
-  4       Act 4 — OS upgrade to RHEL 10.2 (soft reboot)
-  5       Act 5 — App team: Release v1.1 (soft reboot)
-  all     Run all acts in sequence (including infra)
-  cleanup Destroy all VMs, storage pool, network, and config
+Day 1 — Initial deployment (run in order):
+  infra        Set up libvirt network and storage pool
+  1            Build base OS image (RHEL 10.1)
+  2            Convert to qcow2 and provision 3 VMs
+  3            Build and deploy database (PostgreSQL)
+  4            Build and deploy apps v1.0 (backend + frontend)
+  all          Run the full day-1 flow (infra → 1 → 2 → 3 → 4)
 
-Steps (optional, for acts 1-5):
-  build     Build and push images only
-  deploy    Convert qcow2 + provision VMs (act 1) or deploy to VMs
-  provision Provision VMs only (act 1, skips qcow2 conversion)
+Day 2 — Upgrade scenarios (independent, each forks from day 1):
+  5a           OS upgrade: rebuild everything on RHEL 10.2, same tags
+               VMs run: bootc upgrade --apply --soft-reboot=auto
+  5b           App release: build v1.1 on RHEL 10.1, new tags
+               VMs run: bootc update --tag v1.1 --apply --soft-reboot=auto
+  5c           Combined: build v1.1 on RHEL 10.2 (run after 5a)
+               VMs run: bootc update --tag v1.1 --apply --soft-reboot=auto
+
+Sub-steps (optional, for steps 1-4 and 5a/5b/5c):
+  build        Build and push images only
+  deploy       Show VM commands only (step 2: convert + provision)
+  provision    Provision VMs only (step 2, skips qcow2 conversion)
+
+Lifecycle:
+  cleanup      Destroy all VMs, storage pool, network, and config
 
 Defaults:
   Domain:   demo.lab
@@ -741,10 +820,14 @@ Defaults:
 
 Examples:
   $0 infra            # Set up network and storage pool
-  $0 1                # Full Act 1 (build + qcow2 + provision VMs)
-  $0 2 build          # Act 2 build only
-  $0 3 deploy         # Act 3 VM commands only
-  $0 all              # Full demo
+  $0 1                # Build base OS (RHEL 10.1)
+  $0 2                # Convert qcow2 + provision VMs
+  $0 3 build          # Build DB image only
+  $0 4 deploy         # Show app deploy commands only
+  $0 all              # Full day-1 deployment
+  $0 5a               # OS upgrade to RHEL 10.2
+  $0 5b               # App release v1.1 on RHEL 10.1
+  $0 5c               # App release v1.1 on RHEL 10.2 (after 5a)
   $0 cleanup          # Tear down everything
 
 Environment:
@@ -759,63 +842,64 @@ EOF
 
 [[ $# -eq 0 ]] && usage
 
-ACT="${1:-}"
-STEP="${2:-all}"
+STEP_ARG="${1:-}"
+SUB="${2:-all}"
 
-case "$ACT" in
+case "$STEP_ARG" in
   infra)
     setup_network; pause
     setup_pool
     ;;
   1)
-    [[ "$STEP" == "all" || "$STEP" == "build" ]] && act1_build_baseos
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act1_convert_qcow2
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" || "$STEP" == "provision" ]] && provision_vms
+    step1_build_baseos
     ;;
   2)
-    [[ "$STEP" == "all" || "$STEP" == "build" ]] && act2_build_db
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act2_deploy_db
+    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step2_convert_qcow2
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "deploy" || "$SUB" == "provision" ]] && provision_vms
     ;;
   3)
-    [[ "$STEP" == "all" || "$STEP" == "build" ]] && act3_build_apps
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act3_deploy_apps
+    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step3_build_db
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step3_deploy_db
     ;;
   4)
-    [[ "$STEP" == "all" || "$STEP" == "build" ]] && act4_build_baseos
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "build" ]] && act4_rebuild_all
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act4_upgrade_vms
+    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step4_build_apps
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step4_deploy_apps
     ;;
-  5)
-    [[ "$STEP" == "all" || "$STEP" == "build" ]] && act5_build_v11
-    [[ "$STEP" == "all" ]] && pause
-    [[ "$STEP" == "all" || "$STEP" == "deploy" ]] && act5_switch_vms
+  5a)
+    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5a_build_baseos
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5a_rebuild_all
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step5a_upgrade_vms
+    ;;
+  5b)
+    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5b_build_apps
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step5b_update_vms
+    ;;
+  5c)
+    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5c_build_apps
+    [[ "$SUB" == "all" ]] && pause
+    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step5c_update_vms
     ;;
   all)
     setup_network; pause
     setup_pool; pause
-    act1_build_baseos; pause
-    act1_convert_qcow2; pause
+    step1_build_baseos; pause
+    step2_convert_qcow2; pause
     provision_vms; pause
-    act2_build_db; pause
-    act2_deploy_db; pause
-    act3_build_apps; pause
-    act3_deploy_apps; pause
-    act4_build_baseos; pause
-    act4_rebuild_all; pause
-    act4_upgrade_vms; pause
-    act5_build_v11; pause
-    act5_switch_vms
-    banner "Demo complete!"
+    step3_build_db; pause
+    step3_deploy_db; pause
+    step4_build_apps; pause
+    step4_deploy_apps
+    banner "Day 1 deployment complete!"
     ;;
   cleanup)
     cleanup
     ;;
   --help|-h) usage ;;
-  *) echo "Unknown act: $ACT"; usage ;;
+  *) echo "Unknown step: $STEP_ARG"; usage ;;
 esac
