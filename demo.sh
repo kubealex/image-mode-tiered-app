@@ -582,12 +582,78 @@ step4_deploy_apps() {
 }
 
 # ─────────────────────────────────────────────────────────────
-# Step 5a — Day 2: OS upgrade (RHEL 10.1 → 10.2)
+# Step 5a — Day 2: App release v1.1 (on RHEL 10.1)
 #   Starting state: RHEL 10.1, apps v1.0
-#   Rebuild all images on new base OS, same tags → bootc upgrade
+#   Build new app version with new tags → bootc switch (10.1 lacks --tag)
 # ─────────────────────────────────────────────────────────────
-step5a_build_baseos() {
-  banner "Step 5a — OS Upgrade: Build Base OS (RHEL 10.2)"
+step5a_build_apps() {
+  ensure_vm_config
+  banner "Step 5a — App Release: Build Apps v1.1 (on RHEL 10.1)"
+
+  local saved_backend saved_frontend
+  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
+  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
+
+  step "Building image-mode-backend:v1.1"
+  cd "$SCRIPT_DIR/backend"
+  submodule_checkout . v1.1
+  podman build \
+    --build-arg DB_HOST="${VM_DB}" \
+    -t "${REGISTRY}/image-mode-backend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
+
+  step "Pushing image-mode-backend:v1.1 + v1.1-rhel10.1"
+  podman push "${REGISTRY}/image-mode-backend:v1.1"
+  podman push "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
+
+  step "Building image-mode-frontend:v1.1"
+  cd "$SCRIPT_DIR/frontend"
+  submodule_checkout . v1.1
+  podman build \
+    --build-arg API_HOST="${VM_BACKEND}" \
+    -t "${REGISTRY}/image-mode-frontend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
+
+  step "Pushing image-mode-frontend:v1.1 + v1.1-rhel10.1"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
+
+  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
+  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
+
+  echo ""
+  step "App images v1.1 ready on ${REGISTRY}"
+}
+
+step5a_update_vms() {
+  ensure_vm_config
+  banner "Step 5a — App Release: Update VMs to v1.1"
+
+  info "RHEL 10.1 does not support bootc update --tag — use bootc switch to the new image tag."
+  echo ""
+
+  step "Switch backend VM to v1.1"
+  vm_cmd "${VM_BACKEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-backend:v1.1"
+  echo ""
+
+  step "Switch frontend VM to v1.1"
+  vm_cmd "${VM_FRONTEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-frontend:v1.1"
+  echo ""
+
+  step "Verify after soft reboot:"
+  vm_cmd "${VM_BACKEND}" "curl http://localhost:3001/api/timetable"
+  info "Expected: Train timetable data (new Timetable feature)"
+  echo ""
+  vm_cmd "${VM_FRONTEND}" "curl http://localhost:5173/"
+  info "Expected: 200 OK — Timetable page now available in the UI"
+}
+
+# ─────────────────────────────────────────────────────────────
+# Step 5b — Day 2: Ops team releases new base OS (RHEL 10.2)
+#   Build and publish baseos:rhel10.2, re-tag as :latest
+# ─────────────────────────────────────────────────────────────
+step5b_build_baseos() {
+  banner "Step 5b — Ops: Build Base OS (RHEL 10.2)"
 
   if podman image exists "${REGISTRY}/image-mode-baseos:rhel10.2" 2>/dev/null; then
     local ver_sha latest_sha
@@ -631,9 +697,14 @@ step5a_build_baseos() {
   step "baseos:latest now points to RHEL 10.2"
 }
 
-step5a_rebuild_all() {
+# ─────────────────────────────────────────────────────────────
+# Step 5c — Day 2: Rebuild everything on RHEL 10.2 and upgrade
+#   Starting state: RHEL 10.1, apps v1.1 (after 5a), baseos 10.2 ready (after 5b)
+#   Rebuild DB + apps v1.1 on 10.2 base, same tags → bootc upgrade
+# ─────────────────────────────────────────────────────────────
+step5c_rebuild_all() {
   ensure_vm_config
-  banner "Step 5a — OS Upgrade: Rebuild all images on RHEL 10.2"
+  banner "Step 5c — Rebuild all images on RHEL 10.2"
 
   local saved_db saved_backend saved_frontend
   saved_db=$(submodule_save_ref "$SCRIPT_DIR/db")
@@ -648,37 +719,37 @@ step5a_rebuild_all() {
   podman push "${REGISTRY}/image-mode-db:pg16"
   podman push "${REGISTRY}/image-mode-db:pg16-rhel10.2"
 
-  step "Rebuilding image-mode-backend:v1.0 (now on RHEL 10.2)"
+  step "Rebuilding image-mode-backend:v1.1 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/backend"
-  submodule_checkout . v1.0
+  submodule_checkout . v1.1
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
-    -t "${REGISTRY}/image-mode-backend:v1.0" .
-  podman tag "${REGISTRY}/image-mode-backend:v1.0" "${REGISTRY}/image-mode-backend:v1.0-rhel10.2"
-  podman push "${REGISTRY}/image-mode-backend:v1.0"
-  podman push "${REGISTRY}/image-mode-backend:v1.0-rhel10.2"
+    -t "${REGISTRY}/image-mode-backend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
+  podman push "${REGISTRY}/image-mode-backend:v1.1"
+  podman push "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
 
-  step "Rebuilding image-mode-frontend:v1.0 (now on RHEL 10.2)"
+  step "Rebuilding image-mode-frontend:v1.1 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/frontend"
-  submodule_checkout . v1.0
+  submodule_checkout . v1.1
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
-    -t "${REGISTRY}/image-mode-frontend:v1.0" .
-  podman tag "${REGISTRY}/image-mode-frontend:v1.0" "${REGISTRY}/image-mode-frontend:v1.0-rhel10.2"
-  podman push "${REGISTRY}/image-mode-frontend:v1.0"
-  podman push "${REGISTRY}/image-mode-frontend:v1.0-rhel10.2"
+    -t "${REGISTRY}/image-mode-frontend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
 
   submodule_restore_ref "$SCRIPT_DIR/db" "$saved_db"
   submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
   submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
 
   echo ""
-  step "All images rebuilt on RHEL 10.2 base (same tags)"
+  step "All images rebuilt on RHEL 10.2 base"
 }
 
-step5a_upgrade_vms() {
+step5c_upgrade_vms() {
   ensure_vm_config
-  banner "Step 5a — OS Upgrade: Update all VMs"
+  banner "Step 5c — Upgrade all VMs to RHEL 10.2"
 
   info "Each VM pulls the rebuilt image (same tag, new base OS)."
   info "With --soft-reboot=auto, the kernel stays running — downtime in seconds."
@@ -699,143 +770,6 @@ step5a_upgrade_vms() {
   step "Verify after soft reboot:"
   vm_cmd "${VM_FRONTEND}" "cat /etc/redhat-release"
   info "Expected: Red Hat Enterprise Linux release 10.2"
-}
-
-# ─────────────────────────────────────────────────────────────
-# Step 5b — Day 2: App release v1.1 (on RHEL 10.1)
-#   Starting state: RHEL 10.1, apps v1.0
-#   Build new app version with new tags → bootc switch (10.1 lacks --tag)
-# ─────────────────────────────────────────────────────────────
-step5b_build_apps() {
-  ensure_vm_config
-  banner "Step 5b — App Release: Build Apps v1.1 (on RHEL 10.1)"
-
-  local saved_backend saved_frontend
-  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
-  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
-
-  step "Building image-mode-backend:v1.1"
-  cd "$SCRIPT_DIR/backend"
-  submodule_checkout . v1.1
-  podman build \
-    --build-arg DB_HOST="${VM_DB}" \
-    -t "${REGISTRY}/image-mode-backend:v1.1" .
-  podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
-
-  step "Pushing image-mode-backend:v1.1 + v1.1-rhel10.1"
-  podman push "${REGISTRY}/image-mode-backend:v1.1"
-  podman push "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
-
-  step "Building image-mode-frontend:v1.1"
-  cd "$SCRIPT_DIR/frontend"
-  submodule_checkout . v1.1
-  podman build \
-    --build-arg API_HOST="${VM_BACKEND}" \
-    -t "${REGISTRY}/image-mode-frontend:v1.1" .
-  podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
-
-  step "Pushing image-mode-frontend:v1.1 + v1.1-rhel10.1"
-  podman push "${REGISTRY}/image-mode-frontend:v1.1"
-  podman push "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
-
-  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
-  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
-
-  echo ""
-  step "App images v1.1 ready on ${REGISTRY}"
-}
-
-step5b_update_vms() {
-  ensure_vm_config
-  banner "Step 5b — App Release: Update VMs to v1.1"
-
-  info "RHEL 10.1 does not support bootc update --tag — use bootc switch to the new image tag."
-  echo ""
-
-  step "Switch backend VM to v1.1"
-  vm_cmd "${VM_BACKEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-backend:v1.1"
-  echo ""
-
-  step "Switch frontend VM to v1.1"
-  vm_cmd "${VM_FRONTEND}" "sudo bootc switch --apply --soft-reboot=auto ${REGISTRY}/image-mode-frontend:v1.1"
-  echo ""
-
-  step "Verify after soft reboot:"
-  vm_cmd "${VM_BACKEND}" "curl http://localhost:3001/api/timetable"
-  info "Expected: Train timetable data (new Timetable feature)"
-  echo ""
-  vm_cmd "${VM_FRONTEND}" "curl http://localhost:5173/"
-  info "Expected: 200 OK — Timetable page now available in the UI"
-}
-
-# ─────────────────────────────────────────────────────────────
-# Step 5c — Day 2: App release v1.1 on RHEL 10.2
-#   Starting state: RHEL 10.2, apps v1.0 (after 5a)
-#   Build new app version on 10.2 base → bootc update --tag
-# ─────────────────────────────────────────────────────────────
-step5c_build_apps() {
-  ensure_vm_config
-  banner "Step 5c — Combined: Build Apps v1.1 (on RHEL 10.2)"
-
-  info "Base OS is already RHEL 10.2 (from step 5a). Building apps v1.1 on top."
-  echo ""
-
-  local saved_backend saved_frontend
-  saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
-  saved_frontend=$(submodule_save_ref "$SCRIPT_DIR/frontend")
-
-  step "Building image-mode-backend:v1.1 (on RHEL 10.2 base)"
-  cd "$SCRIPT_DIR/backend"
-  submodule_checkout . v1.1
-  podman build \
-    --build-arg DB_HOST="${VM_DB}" \
-    -t "${REGISTRY}/image-mode-backend:v1.1" .
-  podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
-
-  step "Pushing image-mode-backend:v1.1 + v1.1-rhel10.2"
-  podman push "${REGISTRY}/image-mode-backend:v1.1"
-  podman push "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
-
-  step "Building image-mode-frontend:v1.1 (on RHEL 10.2 base)"
-  cd "$SCRIPT_DIR/frontend"
-  submodule_checkout . v1.1
-  podman build \
-    --build-arg API_HOST="${VM_BACKEND}" \
-    -t "${REGISTRY}/image-mode-frontend:v1.1" .
-  podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
-
-  step "Pushing image-mode-frontend:v1.1 + v1.1-rhel10.2"
-  podman push "${REGISTRY}/image-mode-frontend:v1.1"
-  podman push "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
-
-  submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
-  submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
-
-  echo ""
-  step "App images v1.1 (RHEL 10.2 base) ready on ${REGISTRY}"
-}
-
-step5c_update_vms() {
-  ensure_vm_config
-  banner "Step 5c — Combined: Update VMs to v1.1"
-
-  info "VMs are on RHEL 10.2 / v1.0 (from step 5a). Updating apps to v1.1."
-  echo ""
-
-  step "Update backend VM to v1.1"
-  vm_cmd "${VM_BACKEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
-  echo ""
-
-  step "Update frontend VM to v1.1"
-  vm_cmd "${VM_FRONTEND}" "sudo bootc update --tag v1.1 --apply --soft-reboot=auto"
-  echo ""
-
-  step "Verify after soft reboot:"
-  vm_cmd "${VM_BACKEND}" "curl http://localhost:3001/api/timetable"
-  info "Expected: Train timetable data (v1.1 on RHEL 10.2)"
-  echo ""
-  vm_cmd "${VM_FRONTEND}" "curl http://localhost:5173/"
-  info "Expected: 200 OK — Timetable page now available in the UI"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -862,19 +796,15 @@ prebuild() {
   echo ""
 
   step "=== Apps v1.1 on RHEL 10.1 ==="
-  step5b_build_apps
+  step5a_build_apps
   echo ""
 
   step "=== Base OS RHEL 10.2 ==="
-  step5a_build_baseos
+  step5b_build_baseos
   echo ""
 
-  step "=== Database (pg16) + Apps v1.0 on RHEL 10.2 ==="
-  step5a_rebuild_all
-  echo ""
-
-  step "=== Apps v1.1 on RHEL 10.2 ==="
-  step5c_build_apps
+  step "=== Database (pg16) + Apps v1.1 on RHEL 10.2 ==="
+  step5c_rebuild_all
   echo ""
 
   banner "Prebuild complete — all images cached locally and pushed to ${REGISTRY}"
@@ -897,10 +827,10 @@ usage() {
   echo "  4            Build and deploy apps v1.0 (backend + frontend)"
   echo "  all          Run the full day-1 flow (infra -> 1 -> 2 -> 3 -> 4)"
   echo ""
-  echo "Day 2 -- Upgrade scenarios (independent, each forks from day 1):"
-  echo "  5a           OS upgrade: rebuild everything on RHEL 10.2, same tags"
-  echo "  5b           App release: build v1.1 on RHEL 10.1, new tags"
-  echo "  5c           Combined: build v1.1 on RHEL 10.2 (run after 5a)"
+  echo "Day 2 -- Upgrade scenarios (run in order after day 1):"
+  echo "  5a           App release: build and deploy v1.1 on RHEL 10.1"
+  echo "  5b           Ops: build new base OS (RHEL 10.2)"
+  echo "  5c           Rebuild all on RHEL 10.2 and upgrade VMs"
   echo ""
   echo "Lifecycle:"
   echo "  prebuild     Build and push ALL images upfront (speeds up the demo)"
@@ -917,9 +847,9 @@ usage() {
   echo "  demo.sh 1                # Build base OS (RHEL 10.1)"
   echo "  demo.sh 2                # Convert qcow2 + provision VMs"
   echo "  demo.sh all              # Full day-1 deployment"
-  echo "  demo.sh 5a               # OS upgrade to RHEL 10.2"
-  echo "  demo.sh 5b               # App release v1.1 on RHEL 10.1"
-  echo "  demo.sh 5c               # App release v1.1 on RHEL 10.2 (after 5a)"
+  echo "  demo.sh 5a               # App release v1.1 on RHEL 10.1"
+  echo "  demo.sh 5b               # Ops: build base OS RHEL 10.2"
+  echo "  demo.sh 5c               # Rebuild all on RHEL 10.2 + upgrade VMs"
   echo "  demo.sh cleanup          # Tear down everything"
   echo ""
   echo "Environment:"
@@ -956,17 +886,15 @@ case "$STEP_ARG" in
     step4_deploy_apps
     ;;
   5a)
-    step5a_build_baseos; pause
-    step5a_rebuild_all; pause
-    step5a_upgrade_vms
+    step5a_build_apps; pause
+    step5a_update_vms
     ;;
   5b)
-    step5b_build_apps; pause
-    step5b_update_vms
+    step5b_build_baseos
     ;;
   5c)
-    step5c_build_apps; pause
-    step5c_update_vms
+    step5c_rebuild_all; pause
+    step5c_upgrade_vms
     ;;
   all)
     setup_network; pause
