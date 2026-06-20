@@ -839,6 +839,48 @@ step5c_update_vms() {
 }
 
 # ─────────────────────────────────────────────────────────────
+# Prebuild — build all images upfront so demo steps are instant
+# ─────────────────────────────────────────────────────────────
+prebuild() {
+  ensure_vm_config
+  banner "Prebuild: Building all images"
+
+  info "This builds and pushes every image variant so that"
+  info "individual demo steps skip the build phase entirely."
+  echo ""
+
+  step "=== Base OS RHEL 10.1 ==="
+  step1_build_baseos
+  echo ""
+
+  step "=== Database (pg16) on RHEL 10.1 ==="
+  step3_build_db
+  echo ""
+
+  step "=== Apps v1.0 on RHEL 10.1 ==="
+  step4_build_apps
+  echo ""
+
+  step "=== Apps v1.1 on RHEL 10.1 ==="
+  step5b_build_apps
+  echo ""
+
+  step "=== Base OS RHEL 10.2 ==="
+  step5a_build_baseos
+  echo ""
+
+  step "=== Database (pg16) + Apps v1.0 on RHEL 10.2 ==="
+  step5a_rebuild_all
+  echo ""
+
+  step "=== Apps v1.1 on RHEL 10.2 ==="
+  step5c_build_apps
+  echo ""
+
+  banner "Prebuild complete — all images cached locally and pushed to ${REGISTRY}"
+}
+
+# ─────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────
 usage() {
@@ -861,6 +903,7 @@ usage() {
   echo "  5c           Combined: build v1.1 on RHEL 10.2 (run after 5a)"
   echo ""
   echo "Lifecycle:"
+  echo "  prebuild     Build and push ALL images upfront (speeds up the demo)"
   echo "  cleanup      Destroy all VMs, storage pool, network, and config"
   echo ""
   echo "Defaults:"
@@ -936,6 +979,9 @@ case "$STEP_ARG" in
     step4_build_apps; pause
     step4_deploy_apps
     banner "Day 1 deployment complete!"
+    ;;
+  prebuild)
+    prebuild
     ;;
   cleanup)
     cleanup
