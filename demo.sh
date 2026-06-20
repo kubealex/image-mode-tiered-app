@@ -782,21 +782,21 @@ step5c_update_vms() {
 # Main
 # ─────────────────────────────────────────────────────────────
 usage() {
-  cat <<EOF
-Usage: $0 <step> [build|deploy]
+  cat <<'USAGE'
+Usage: demo.sh <step> [build|deploy]
 
-Train Tickets image-mode demo — build, deploy, and upgrade bootc VMs.
+Train Tickets image-mode demo -- build, deploy, and upgrade bootc VMs.
 Configuration is prompted on first use and saved to .demo-config.
 
-Day 1 — Initial deployment (run in order):
+Day 1 -- Initial deployment (run in order):
   infra        Set up libvirt network and storage pool
   1            Build base OS image (RHEL 10.1)
   2            Convert to qcow2 and provision 3 VMs
   3            Build and deploy database (PostgreSQL)
   4            Build and deploy apps v1.0 (backend + frontend)
-  all          Run the full day-1 flow (infra → 1 → 2 → 3 → 4)
+  all          Run the full day-1 flow (infra -> 1 -> 2 -> 3 -> 4)
 
-Day 2 — Upgrade scenarios (independent, each forks from day 1):
+Day 2 -- Upgrade scenarios (independent, each forks from day 1):
   5a           OS upgrade: rebuild everything on RHEL 10.2, same tags
                VMs run: bootc upgrade --apply --soft-reboot=auto
   5b           App release: build v1.1 on RHEL 10.1, new tags
@@ -819,16 +819,16 @@ Defaults:
   Frontend: im-train.demo.lab
 
 Examples:
-  $0 infra            # Set up network and storage pool
-  $0 1                # Build base OS (RHEL 10.1)
-  $0 2                # Convert qcow2 + provision VMs
-  $0 3 build          # Build DB image only
-  $0 4 deploy         # Show app deploy commands only
-  $0 all              # Full day-1 deployment
-  $0 5a               # OS upgrade to RHEL 10.2
-  $0 5b               # App release v1.1 on RHEL 10.1
-  $0 5c               # App release v1.1 on RHEL 10.2 (after 5a)
-  $0 cleanup          # Tear down everything
+  demo.sh infra            # Set up network and storage pool
+  demo.sh 1                # Build base OS (RHEL 10.1)
+  demo.sh 2                # Convert qcow2 + provision VMs
+  demo.sh 3 build          # Build DB image only
+  demo.sh 4 deploy         # Show app deploy commands only
+  demo.sh all              # Full day-1 deployment
+  demo.sh 5a               # OS upgrade to RHEL 10.2
+  demo.sh 5b               # App release v1.1 on RHEL 10.1
+  demo.sh 5c               # App release v1.1 on RHEL 10.2 (after 5a)
+  demo.sh cleanup          # Tear down everything
 
 Environment:
   REGISTRY       Container registry (default: quay.io/kubealex)
@@ -836,7 +836,7 @@ Environment:
   VM_VCPUS       vCPUs per VM (default: 2)
   VM_RAM         RAM in MiB per VM (default: 4096)
   VM_DISK        Disk size in GiB per VM (default: 20)
-EOF
+USAGE
   exit 0
 }
 
