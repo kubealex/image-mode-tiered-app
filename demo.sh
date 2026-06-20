@@ -489,6 +489,18 @@ step2_convert_qcow2() {
 step3_build_db() {
   banner "Step 3 — Build Database Image (PostgreSQL)"
 
+  step "Verifying baseos:latest matches RHEL 10.1"
+  local latest_sha ver_sha
+  latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+  ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.1" 2>/dev/null || true)
+  if [[ -z "$ver_sha" ]]; then
+    echo "ERROR: baseos:rhel10.1 not found — run step 1 first." >&2; exit 1
+  fi
+  if [[ "$latest_sha" != "$ver_sha" ]]; then
+    echo "ERROR: baseos:latest does not match baseos:rhel10.1 — run step 1 to rebuild." >&2; exit 1
+  fi
+  info "baseos:latest SHA matches rhel10.1 ✔"
+
   local saved_ref
   saved_ref=$(submodule_save_ref "$SCRIPT_DIR/db")
 
@@ -529,6 +541,18 @@ step3_deploy_db() {
 step4_build_apps() {
   ensure_vm_config
   banner "Step 4 — Build Apps v1.0 (Backend + Frontend)"
+
+  step "Verifying baseos:latest matches RHEL 10.1"
+  local latest_sha ver_sha
+  latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+  ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.1" 2>/dev/null || true)
+  if [[ -z "$ver_sha" ]]; then
+    echo "ERROR: baseos:rhel10.1 not found — run step 1 first." >&2; exit 1
+  fi
+  if [[ "$latest_sha" != "$ver_sha" ]]; then
+    echo "ERROR: baseos:latest does not match baseos:rhel10.1 — run step 1 to rebuild." >&2; exit 1
+  fi
+  info "baseos:latest SHA matches rhel10.1 ✔"
 
   local saved_backend saved_frontend
   saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
