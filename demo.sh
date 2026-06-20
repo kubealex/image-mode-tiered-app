@@ -405,7 +405,16 @@ step1_build_baseos() {
   banner "Step 1 — Build Base OS (RHEL 10.1)"
 
   if podman image exists "${REGISTRY}/image-mode-baseos:rhel10.1" 2>/dev/null; then
-    step "baseos:rhel10.1 already exists locally — skipping build"
+    local ver_sha latest_sha
+    ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.1" 2>/dev/null)
+    latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+    if [[ "$ver_sha" == "$latest_sha" ]]; then
+      step "baseos:rhel10.1 already exists and :latest matches — skipping build"
+      echo ""
+      step "baseos:latest now points to RHEL 10.1 (cached)"
+      return
+    fi
+    step "baseos:rhel10.1 exists but :latest points elsewhere — re-tagging"
     podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
     echo ""
     step "baseos:latest now points to RHEL 10.1 (cached)"
@@ -569,7 +578,16 @@ step5a_build_baseos() {
   banner "Step 5a — OS Upgrade: Build Base OS (RHEL 10.2)"
 
   if podman image exists "${REGISTRY}/image-mode-baseos:rhel10.2" 2>/dev/null; then
-    step "baseos:rhel10.2 already exists locally — skipping build"
+    local ver_sha latest_sha
+    ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.2" 2>/dev/null)
+    latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+    if [[ "$ver_sha" == "$latest_sha" ]]; then
+      step "baseos:rhel10.2 already exists and :latest matches — skipping build"
+      echo ""
+      step "baseos:latest now points to RHEL 10.2 (cached)"
+      return
+    fi
+    step "baseos:rhel10.2 exists but :latest points elsewhere — re-tagging"
     podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
     echo ""
     step "baseos:latest now points to RHEL 10.2 (cached)"
