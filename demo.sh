@@ -591,8 +591,17 @@ step5a_build_apps() {
   ensure_vm_config
   banner "Step 5a — App Release: Build Apps v1.1 (on RHEL 10.1)"
 
-  step "Ensuring baseos:latest points to RHEL 10.1"
-  podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
+  step "Verifying baseos:latest matches RHEL 10.1"
+  local latest_sha ver_sha
+  latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+  ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.1" 2>/dev/null || true)
+  if [[ -z "$ver_sha" ]]; then
+    echo "ERROR: baseos:rhel10.1 not found — run step 1 first." >&2; exit 1
+  fi
+  if [[ "$latest_sha" != "$ver_sha" ]]; then
+    echo "ERROR: baseos:latest does not match baseos:rhel10.1 — run step 1 to rebuild." >&2; exit 1
+  fi
+  info "baseos:latest SHA matches rhel10.1 ✔"
 
   local saved_backend saved_frontend
   saved_backend=$(submodule_save_ref "$SCRIPT_DIR/backend")
@@ -711,8 +720,17 @@ step5c_rebuild_all() {
   ensure_vm_config
   banner "Step 5c — Rebuild all images on RHEL 10.2"
 
-  step "Ensuring baseos:latest points to RHEL 10.2"
-  podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
+  step "Verifying baseos:latest matches RHEL 10.2"
+  local latest_sha ver_sha
+  latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+  ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.2" 2>/dev/null || true)
+  if [[ -z "$ver_sha" ]]; then
+    echo "ERROR: baseos:rhel10.2 not found — run step 5b first." >&2; exit 1
+  fi
+  if [[ "$latest_sha" != "$ver_sha" ]]; then
+    echo "ERROR: baseos:latest does not match baseos:rhel10.2 — run step 5b to rebuild." >&2; exit 1
+  fi
+  info "baseos:latest SHA matches rhel10.2 ✔"
 
   local saved_db saved_backend saved_frontend
   saved_db=$(submodule_save_ref "$SCRIPT_DIR/db")
