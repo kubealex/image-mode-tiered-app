@@ -404,6 +404,14 @@ cleanup() {
 step1_build_baseos() {
   banner "Step 1 — Build Base OS (RHEL 10.1)"
 
+  if podman image exists "${REGISTRY}/image-mode-baseos:rhel10.1" 2>/dev/null; then
+    step "baseos:rhel10.1 already exists locally — skipping build"
+    podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
+    echo ""
+    step "baseos:latest now points to RHEL 10.1 (cached)"
+    return
+  fi
+
   local saved_ref
   saved_ref=$(submodule_save_ref "$SCRIPT_DIR/baseos")
 
@@ -419,7 +427,7 @@ step1_build_baseos() {
 
   step "Re-pulling from registry (compressed layers for bootc)"
   podman rmi --force "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true
-  podman system prune --all --force >/dev/null
+  podman image prune --force >/dev/null
   podman pull "${REGISTRY}/image-mode-baseos:rhel10.1"
   podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
 
@@ -560,6 +568,14 @@ step4_deploy_apps() {
 step5a_build_baseos() {
   banner "Step 5a — OS Upgrade: Build Base OS (RHEL 10.2)"
 
+  if podman image exists "${REGISTRY}/image-mode-baseos:rhel10.2" 2>/dev/null; then
+    step "baseos:rhel10.2 already exists locally — skipping build"
+    podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
+    echo ""
+    step "baseos:latest now points to RHEL 10.2 (cached)"
+    return
+  fi
+
   local saved_ref
   saved_ref=$(submodule_save_ref "$SCRIPT_DIR/baseos")
 
@@ -575,7 +591,7 @@ step5a_build_baseos() {
 
   step "Re-pulling from registry (compressed layers for bootc)"
   podman rmi --force "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true
-  podman system prune --all --force >/dev/null
+  podman image prune --force >/dev/null
   podman pull "${REGISTRY}/image-mode-baseos:rhel10.2"
   podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
 
