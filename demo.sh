@@ -495,9 +495,11 @@ step3_build_db() {
   cd "$SCRIPT_DIR/db"
   submodule_checkout . pg16
   podman build -t "${REGISTRY}/image-mode-db:pg16" .
+  podman tag "${REGISTRY}/image-mode-db:pg16" "${REGISTRY}/image-mode-db:pg16-rhel10.1"
 
-  step "Pushing image-mode-db:pg16"
+  step "Pushing image-mode-db:pg16 + pg16-rhel10.1"
   podman push "${REGISTRY}/image-mode-db:pg16"
+  podman push "${REGISTRY}/image-mode-db:pg16-rhel10.1"
 
   submodule_restore_ref "$SCRIPT_DIR/db" "$saved_ref"
 
@@ -537,9 +539,11 @@ step4_build_apps() {
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.0" .
+  podman tag "${REGISTRY}/image-mode-backend:v1.0" "${REGISTRY}/image-mode-backend:v1.0-rhel10.1"
 
-  step "Pushing image-mode-backend:v1.0"
+  step "Pushing image-mode-backend:v1.0 + v1.0-rhel10.1"
   podman push "${REGISTRY}/image-mode-backend:v1.0"
+  podman push "${REGISTRY}/image-mode-backend:v1.0-rhel10.1"
 
   step "Building image-mode-frontend:v1.0"
   cd "$SCRIPT_DIR/frontend"
@@ -547,9 +551,11 @@ step4_build_apps() {
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.0" .
+  podman tag "${REGISTRY}/image-mode-frontend:v1.0" "${REGISTRY}/image-mode-frontend:v1.0-rhel10.1"
 
-  step "Pushing image-mode-frontend:v1.0"
+  step "Pushing image-mode-frontend:v1.0 + v1.0-rhel10.1"
   podman push "${REGISTRY}/image-mode-frontend:v1.0"
+  podman push "${REGISTRY}/image-mode-frontend:v1.0-rhel10.1"
 
   submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
   submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
@@ -638,7 +644,9 @@ step5a_rebuild_all() {
   cd "$SCRIPT_DIR/db"
   submodule_checkout . pg16
   podman build -t "${REGISTRY}/image-mode-db:pg16" .
+  podman tag "${REGISTRY}/image-mode-db:pg16" "${REGISTRY}/image-mode-db:pg16-rhel10.2"
   podman push "${REGISTRY}/image-mode-db:pg16"
+  podman push "${REGISTRY}/image-mode-db:pg16-rhel10.2"
 
   step "Rebuilding image-mode-backend:v1.0 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/backend"
@@ -646,7 +654,9 @@ step5a_rebuild_all() {
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.0" .
+  podman tag "${REGISTRY}/image-mode-backend:v1.0" "${REGISTRY}/image-mode-backend:v1.0-rhel10.2"
   podman push "${REGISTRY}/image-mode-backend:v1.0"
+  podman push "${REGISTRY}/image-mode-backend:v1.0-rhel10.2"
 
   step "Rebuilding image-mode-frontend:v1.0 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/frontend"
@@ -654,7 +664,9 @@ step5a_rebuild_all() {
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.0" .
+  podman tag "${REGISTRY}/image-mode-frontend:v1.0" "${REGISTRY}/image-mode-frontend:v1.0-rhel10.2"
   podman push "${REGISTRY}/image-mode-frontend:v1.0"
+  podman push "${REGISTRY}/image-mode-frontend:v1.0-rhel10.2"
 
   submodule_restore_ref "$SCRIPT_DIR/db" "$saved_db"
   submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
@@ -708,9 +720,11 @@ step5b_build_apps() {
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
 
-  step "Pushing image-mode-backend:v1.1"
+  step "Pushing image-mode-backend:v1.1 + v1.1-rhel10.1"
   podman push "${REGISTRY}/image-mode-backend:v1.1"
+  podman push "${REGISTRY}/image-mode-backend:v1.1-rhel10.1"
 
   step "Building image-mode-frontend:v1.1"
   cd "$SCRIPT_DIR/frontend"
@@ -718,9 +732,11 @@ step5b_build_apps() {
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
 
-  step "Pushing image-mode-frontend:v1.1"
+  step "Pushing image-mode-frontend:v1.1 + v1.1-rhel10.1"
   podman push "${REGISTRY}/image-mode-frontend:v1.1"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1-rhel10.1"
 
   submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
   submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
@@ -774,9 +790,11 @@ step5c_build_apps() {
   podman build \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
 
-  step "Pushing image-mode-backend:v1.1"
+  step "Pushing image-mode-backend:v1.1 + v1.1-rhel10.2"
   podman push "${REGISTRY}/image-mode-backend:v1.1"
+  podman push "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
 
   step "Building image-mode-frontend:v1.1 (on RHEL 10.2 base)"
   cd "$SCRIPT_DIR/frontend"
@@ -784,9 +802,11 @@ step5c_build_apps() {
   podman build \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.1" .
+  podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
 
-  step "Pushing image-mode-frontend:v1.1"
+  step "Pushing image-mode-frontend:v1.1 + v1.1-rhel10.2"
   podman push "${REGISTRY}/image-mode-frontend:v1.1"
+  podman push "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
 
   submodule_restore_ref "$SCRIPT_DIR/backend" "$saved_backend"
   submodule_restore_ref "$SCRIPT_DIR/frontend" "$saved_frontend"
