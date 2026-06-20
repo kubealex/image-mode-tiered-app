@@ -422,6 +422,7 @@ step1_build_baseos() {
     fi
     step "baseos:rhel10.1 exists but :latest points elsewhere — re-tagging"
     podman tag "${REGISTRY}/image-mode-baseos:rhel10.1" "${REGISTRY}/image-mode-baseos:latest"
+    podman push "${REGISTRY}/image-mode-baseos:latest"
     echo ""
     step "baseos:latest now points to RHEL 10.1 (cached)"
     return
@@ -667,6 +668,7 @@ step5b_build_baseos() {
     fi
     step "baseos:rhel10.2 exists but :latest points elsewhere — re-tagging"
     podman tag "${REGISTRY}/image-mode-baseos:rhel10.2" "${REGISTRY}/image-mode-baseos:latest"
+    podman push "${REGISTRY}/image-mode-baseos:latest"
     echo ""
     step "baseos:latest now points to RHEL 10.2 (cached)"
     return
@@ -714,7 +716,7 @@ step5c_rebuild_all() {
   step "Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/db"
   submodule_checkout . pg16
-  podman build -t "${REGISTRY}/image-mode-db:pg16" .
+  podman build --pull=always -t "${REGISTRY}/image-mode-db:pg16" .
   podman tag "${REGISTRY}/image-mode-db:pg16" "${REGISTRY}/image-mode-db:pg16-rhel10.2"
   podman push "${REGISTRY}/image-mode-db:pg16"
   podman push "${REGISTRY}/image-mode-db:pg16-rhel10.2"
@@ -722,7 +724,7 @@ step5c_rebuild_all() {
   step "Rebuilding image-mode-backend:v1.1 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/backend"
   submodule_checkout . v1.1
-  podman build \
+  podman build --pull=always \
     --build-arg DB_HOST="${VM_DB}" \
     -t "${REGISTRY}/image-mode-backend:v1.1" .
   podman tag "${REGISTRY}/image-mode-backend:v1.1" "${REGISTRY}/image-mode-backend:v1.1-rhel10.2"
@@ -732,7 +734,7 @@ step5c_rebuild_all() {
   step "Rebuilding image-mode-frontend:v1.1 (now on RHEL 10.2)"
   cd "$SCRIPT_DIR/frontend"
   submodule_checkout . v1.1
-  podman build \
+  podman build --pull=always \
     --build-arg API_HOST="${VM_BACKEND}" \
     -t "${REGISTRY}/image-mode-frontend:v1.1" .
   podman tag "${REGISTRY}/image-mode-frontend:v1.1" "${REGISTRY}/image-mode-frontend:v1.1-rhel10.2"
