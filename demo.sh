@@ -391,6 +391,12 @@ cleanup() {
     podman rmi --all --force "$img" 2>/dev/null || true
   done
 
+  step "Removing SSH known_hosts entries"
+  for host in "${VM_DB}" "${VM_BACKEND}" "${VM_FRONTEND}" \
+              "${VM_DB_SHORT}" "${VM_BACKEND_SHORT}" "${VM_FRONTEND_SHORT}"; do
+    ssh-keygen -R "$host" 2>/dev/null || true
+  done
+
   step "Removing config file"
   rm -f "$CONFIG_FILE"
 
