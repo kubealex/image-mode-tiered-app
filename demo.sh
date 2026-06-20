@@ -816,7 +816,7 @@ step5c_update_vms() {
 # Main
 # ─────────────────────────────────────────────────────────────
 usage() {
-  echo "Usage: demo.sh <step> [build|deploy]"
+  echo "Usage: demo.sh <step>"
   echo ""
   echo "Train Tickets image-mode demo -- build, deploy, and upgrade bootc VMs."
   echo "Configuration is prompted on first use and saved to .demo-config."
@@ -834,11 +834,6 @@ usage() {
   echo "  5b           App release: build v1.1 on RHEL 10.1, new tags"
   echo "  5c           Combined: build v1.1 on RHEL 10.2 (run after 5a)"
   echo ""
-  echo "Sub-steps (optional, for steps 1-4 and 5a/5b/5c):"
-  echo "  build        Build and push images only"
-  echo "  deploy       Show VM commands only (step 2: convert + provision)"
-  echo "  provision    Provision VMs only (step 2, skips qcow2 conversion)"
-  echo ""
   echo "Lifecycle:"
   echo "  cleanup      Destroy all VMs, storage pool, network, and config"
   echo ""
@@ -852,8 +847,6 @@ usage() {
   echo "  demo.sh infra            # Set up network and storage pool"
   echo "  demo.sh 1                # Build base OS (RHEL 10.1)"
   echo "  demo.sh 2                # Convert qcow2 + provision VMs"
-  echo "  demo.sh 3 build          # Build DB image only"
-  echo "  demo.sh 4 deploy         # Show app deploy commands only"
   echo "  demo.sh all              # Full day-1 deployment"
   echo "  demo.sh 5a               # OS upgrade to RHEL 10.2"
   echo "  demo.sh 5b               # App release v1.1 on RHEL 10.1"
@@ -872,7 +865,6 @@ usage() {
 [[ $# -eq 0 ]] && usage
 
 STEP_ARG="${1:-}"
-SUB="${2:-all}"
 
 case "$STEP_ARG" in
   infra)
@@ -883,36 +875,29 @@ case "$STEP_ARG" in
     step1_build_baseos
     ;;
   2)
-    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step2_convert_qcow2
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "deploy" || "$SUB" == "provision" ]] && provision_vms
+    step2_convert_qcow2; pause
+    provision_vms
     ;;
   3)
-    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step3_build_db
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step3_deploy_db
+    step3_build_db; pause
+    step3_deploy_db
     ;;
   4)
-    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step4_build_apps
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step4_deploy_apps
+    step4_build_apps; pause
+    step4_deploy_apps
     ;;
   5a)
-    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5a_build_baseos
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5a_rebuild_all
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step5a_upgrade_vms
+    step5a_build_baseos; pause
+    step5a_rebuild_all; pause
+    step5a_upgrade_vms
     ;;
   5b)
-    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5b_build_apps
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step5b_update_vms
+    step5b_build_apps; pause
+    step5b_update_vms
     ;;
   5c)
-    [[ "$SUB" == "all" || "$SUB" == "build" ]] && step5c_build_apps
-    [[ "$SUB" == "all" ]] && pause
-    [[ "$SUB" == "all" || "$SUB" == "deploy" ]] && step5c_update_vms
+    step5c_build_apps; pause
+    step5c_update_vms
     ;;
   all)
     setup_network; pause
