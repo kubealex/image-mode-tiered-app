@@ -10,11 +10,14 @@ A three-tier train ticket booking application designed to run as RHEL bootc/imag
 │  React 18   │     │  Express.js │     │ PostgreSQL 16│
 │  Vite + PF6 │     │  Node.js    │     │              │
 │  :5173      │     │  :3001      │     │  :5432       │
+│  bootc-api  │     │  bootc-api  │     │  bootc-api   │
+│  :8005      │     │  :8005      │     │  :8005       │
 └─────────────┘     └─────────────┘     └─────────────┘
        │                   │                    │
        └───────────────────┴────────────────────┘
                   Base OS (RHEL bootc)
                   PCI-DSS hardened via OpenSCAP
+                  bootc-api status service
 ```
 
 ## Repositories
@@ -141,6 +144,21 @@ API_HOST=backend-hostname
 Default credentials: `postgres` / `postgres`, database `train_tickets`, port `5432`.
 
 The database initializes automatically on first boot — no manual setup required.
+
+### bootc-api Status Service
+
+Every tier includes [bootc-api](https://github.com/kubealex/bootc-api), a lightweight status service installed in the base OS image. It runs on port `8005` and exposes the bootc image-mode status via REST endpoints:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/v1/status` | Full bootc host status |
+| `GET /api/v1/status/booted` | Currently booted image details |
+| `GET /api/v1/status/staged` | Staged update (if any) |
+| `GET /api/v1/status/rollback` | Rollback entry |
+| `GET /api/v1/status/update-available` | Whether an update is cached/staged |
+| `GET /health` | Health check |
+
+The frontend Status page aggregates bootc status from all three tiers, showing each VM's booted image, digest, OS version, architecture, and update availability.
 
 ## Updating Submodules
 

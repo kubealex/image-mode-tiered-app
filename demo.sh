@@ -604,6 +604,12 @@ step4_deploy_apps() {
   step "Verify after reboot:"
   vm_cmd "${VM_BACKEND}" "curl http://localhost:3001/api/health"
   info "Expected: {\"status\":\"ok\",\"backend\":{\"status\":\"ok\"},\"database\":{\"status\":\"ok\"}}"
+  echo ""
+  step "Verify bootc-api on each VM:"
+  vm_cmd "${VM_DB}" "curl http://localhost:8005/health"
+  vm_cmd "${VM_BACKEND}" "curl http://localhost:8005/health"
+  vm_cmd "${VM_FRONTEND}" "curl http://localhost:8005/health"
+  info "Expected: {\"status\":\"ok\"} from each"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -683,6 +689,10 @@ step5a_update_vms() {
   echo ""
   vm_cmd "${VM_FRONTEND}" "curl http://localhost:5173/"
   info "Expected: 200 OK — Timetable page now available in the UI"
+  echo ""
+  step "Verify bootc-api status:"
+  vm_cmd "${VM_BACKEND}" "curl http://localhost:8005/api/v1/status/booted | jq .image.image.image"
+  info "Expected: image-mode-backend:v1.1"
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -820,6 +830,10 @@ step5c_upgrade_vms() {
   step "Verify after soft reboot:"
   vm_cmd "${VM_FRONTEND}" "cat /etc/redhat-release"
   info "Expected: Red Hat Enterprise Linux release 10.2"
+  echo ""
+  step "Verify bootc-api reports new OS version:"
+  vm_cmd "${VM_FRONTEND}" "curl http://localhost:8005/api/v1/status/booted | jq .image.version"
+  info "Expected: 10.2"
 }
 
 # ─────────────────────────────────────────────────────────────
