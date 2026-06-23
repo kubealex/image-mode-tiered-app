@@ -383,13 +383,10 @@ cleanup() {
   rm -rf "$VM_IMAGES_DIR"
 
   step "Removing container images"
-  for img in \
-    "${REGISTRY}/image-mode-baseos" \
-    "${REGISTRY}/image-mode-db" \
-    "${REGISTRY}/image-mode-backend" \
-    "${REGISTRY}/image-mode-frontend"; do
-    podman rmi --all --force "$img" 2>/dev/null || true
+  for img in $(podman images --format '{{.Repository}}:{{.Tag}}' | grep "${REGISTRY}/image-mode-" | sort -u); do
+    podman rmi --force "$img" 2>/dev/null || true
   done
+  podman image prune --force >/dev/null 2>&1 || true
 
   step "Removing SSH known_hosts entries"
   for host in "${VM_DB}" "${VM_BACKEND}" "${VM_FRONTEND}" \
