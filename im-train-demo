@@ -407,7 +407,7 @@ cleanup() {
 # ─────────────────────────────────────────────────────────────
 # Introduction — Walk through all Containerfiles
 # ─────────────────────────────────────────────────────────────
-show_images() {
+show_containerfiles() {
   banner "Image Mode Train Service — Containerfile Walkthrough"
 
   step "Base OS — Hardened RHEL with OpenSCAP PCI-DSS"
@@ -892,13 +892,13 @@ prebuild() {
 # Main
 # ─────────────────────────────────────────────────────────────
 usage() {
-  echo "Usage: demo.sh <step>"
+  echo "Usage: im-train-demo <step>"
   echo ""
   echo "Train Tickets image-mode demo -- build, deploy, and upgrade bootc VMs."
   echo "Configuration is prompted on first use and saved to .demo-config."
   echo ""
   echo "Introduction:"
-  echo "  show-images      Walk through all Containerfiles with bat"
+  echo "  show-containerfiles      Walk through all Containerfiles with bat"
   echo ""
   echo "Day 1 -- Initial deployment (run in order):"
   echo "  infra            Set up libvirt network and storage pool"
@@ -924,14 +924,14 @@ usage() {
   echo "  Frontend: im-train.demo.lab"
   echo ""
   echo "Examples:"
-  echo "  demo.sh infra            # Set up network and storage pool"
-  echo "  demo.sh build-baseos     # Build base OS (RHEL 10.1)"
-  echo "  demo.sh deploy-vms       # Convert qcow2 + provision VMs"
-  echo "  demo.sh all              # Full day-1 deployment"
-  echo "  demo.sh release-app      # App release v1.1 on RHEL 10.1"
-  echo "  demo.sh upgrade-baseos   # Ops: build base OS RHEL 10.2"
-  echo "  demo.sh upgrade-vms      # Rebuild all on RHEL 10.2 + upgrade VMs"
-  echo "  demo.sh cleanup          # Tear down everything"
+  echo "  im-train-demo infra            # Set up network and storage pool"
+  echo "  im-train-demo build-baseos     # Build base OS (RHEL 10.1)"
+  echo "  im-train-demo deploy-vms       # Convert qcow2 + provision VMs"
+  echo "  im-train-demo all              # Full day-1 deployment"
+  echo "  im-train-demo release-app      # App release v1.1 on RHEL 10.1"
+  echo "  im-train-demo upgrade-baseos   # Ops: build base OS RHEL 10.2"
+  echo "  im-train-demo upgrade-vms      # Rebuild all on RHEL 10.2 + upgrade VMs"
+  echo "  im-train-demo cleanup          # Tear down everything"
   echo ""
   echo "Environment:"
   echo "  REGISTRY       Container registry (default: quay.io/kubealex)"
@@ -947,8 +947,8 @@ usage() {
 STEP_ARG="${1:-}"
 
 case "$STEP_ARG" in
-  show-images)
-    show_images
+  show-containerfiles)
+    show_containerfiles
     ;;
   infra)
     setup_network; pause
