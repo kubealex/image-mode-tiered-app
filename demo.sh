@@ -405,6 +405,28 @@ cleanup() {
 }
 
 # ─────────────────────────────────────────────────────────────
+# Introduction — Walk through all Containerfiles
+# ─────────────────────────────────────────────────────────────
+show_images() {
+  banner "Image Mode Train Service — Containerfile Walkthrough"
+
+  step "Base OS — Hardened RHEL with OpenSCAP PCI-DSS"
+  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/baseos/Containerfile"
+  pause
+
+  step "Database — PostgreSQL on base OS"
+  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/db/Containerfile"
+  pause
+
+  step "Backend — Express.js API on base OS"
+  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/backend/Containerfile"
+  pause
+
+  step "Frontend — React + Vite on base OS"
+  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/frontend/Containerfile"
+}
+
+# ─────────────────────────────────────────────────────────────
 # Step 1 — Build Base OS (RHEL 10.1)
 # ─────────────────────────────────────────────────────────────
 step1_build_baseos() {
@@ -875,6 +897,9 @@ usage() {
   echo "Train Tickets image-mode demo -- build, deploy, and upgrade bootc VMs."
   echo "Configuration is prompted on first use and saved to .demo-config."
   echo ""
+  echo "Introduction:"
+  echo "  show-images      Walk through all Containerfiles with bat"
+  echo ""
   echo "Day 1 -- Initial deployment (run in order):"
   echo "  infra            Set up libvirt network and storage pool"
   echo "  build-baseos     Build base OS image (RHEL 10.1)"
@@ -922,6 +947,9 @@ usage() {
 STEP_ARG="${1:-}"
 
 case "$STEP_ARG" in
+  show-images)
+    show_images
+    ;;
   infra)
     setup_network; pause
     setup_pool
