@@ -1,10 +1,20 @@
-# Train Tickets Image-Mode Demo — Instructor Guide
+# Image Mode Train Service — Instructor Guide
 
-## Registry Login
+## Pre-demo
 
 ```bash
 podman login registry.redhat.io
 podman login quay.io
+source im-train-demo-completion.bash
+./im-train-demo prebuild
+```
+
+---
+
+## Walkthrough — Containerfile Review
+
+```bash
+./im-train-demo show-containerfiles
 ```
 
 ---
@@ -14,66 +24,39 @@ podman login quay.io
 ### Build Base OS (RHEL 10.1)
 
 ```bash
-cd baseos
-git checkout rhel10.1
-
-podman build -t quay.io/kubealex/image-mode-baseos:rhel10.1 .
-podman tag quay.io/kubealex/image-mode-baseos:rhel10.1 quay.io/kubealex/image-mode-baseos:latest
-
-podman push quay.io/kubealex/image-mode-baseos:rhel10.1
-podman push quay.io/kubealex/image-mode-baseos:latest
-
-podman rmi --force quay.io/kubealex/image-mode-baseos:rhel10.1 quay.io/kubealex/image-mode-baseos:latest
-podman image prune --force
-podman pull quay.io/kubealex/image-mode-baseos:rhel10.1
-podman tag quay.io/kubealex/image-mode-baseos:rhel10.1 quay.io/kubealex/image-mode-baseos:latest
+./im-train-demo build-baseos
 ```
 
-### Build Database (PostgreSQL)
+### Deploy VMs
 
 ```bash
-cd db
-git checkout pg16
-
-podman build -t quay.io/kubealex/image-mode-db:pg16 .
-podman tag quay.io/kubealex/image-mode-db:pg16 quay.io/kubealex/image-mode-db:pg16-rhel10.1
-
-podman push quay.io/kubealex/image-mode-db:pg16
-podman push quay.io/kubealex/image-mode-db:pg16-rhel10.1
+./im-train-demo deploy-vms
 ```
 
-### Deploy Database
+### Build and Deploy Database
+
+```bash
+./im-train-demo build-db
+```
 
 ```bash
 ssh bootc-user@im-train-db.demo.lab
 sudo bootc switch --apply --soft-reboot=auto quay.io/kubealex/image-mode-db:pg16
 ```
 
-### Build Apps v1.0
+After reboot:
 
 ```bash
-cd backend
-git checkout v1.0
-
-podman build --build-arg DB_HOST=im-train-db.demo.lab -t quay.io/kubealex/image-mode-backend:v1.0 .
-podman tag quay.io/kubealex/image-mode-backend:v1.0 quay.io/kubealex/image-mode-backend:v1.0-rhel10.1
-
-podman push quay.io/kubealex/image-mode-backend:v1.0
-podman push quay.io/kubealex/image-mode-backend:v1.0-rhel10.1
+ssh bootc-user@im-train-db.demo.lab
+sudo systemctl status train-tickets-db
+sudo -u postgres psql -d train_tickets -c 'SELECT count(*) FROM stations;'
 ```
+
+### Build and Deploy Apps v1.0
 
 ```bash
-cd frontend
-git checkout v1.0
-
-podman build --build-arg API_HOST=im-train-api.demo.lab -t quay.io/kubealex/image-mode-frontend:v1.0 .
-podman tag quay.io/kubealex/image-mode-frontend:v1.0 quay.io/kubealex/image-mode-frontend:v1.0-rhel10.1
-
-podman push quay.io/kubealex/image-mode-frontend:v1.0
-podman push quay.io/kubealex/image-mode-frontend:v1.0-rhel10.1
+./im-train-demo build-apps
 ```
-
-### Deploy Apps v1.0
 
 ```bash
 ssh bootc-user@im-train-api.demo.lab
@@ -85,32 +68,23 @@ ssh bootc-user@im-train.demo.lab
 sudo bootc switch --apply --soft-reboot=auto quay.io/kubealex/image-mode-frontend:v1.0
 ```
 
+After reboot:
+
+```bash
+ssh bootc-user@im-train-api.demo.lab
+curl http://localhost:3001/api/health
+```
+
+Open browser: `http://im-train.demo.lab:5173`
+
 ---
 
 ## Day 2 — Lifecycle
 
-### 5a — App Release: v1.1 on RHEL 10.1
+### App Release: v1.1 on RHEL 10.1
 
 ```bash
-cd backend
-git checkout v1.1
-
-podman build --build-arg DB_HOST=im-train-db.demo.lab -t quay.io/kubealex/image-mode-backend:v1.1 .
-podman tag quay.io/kubealex/image-mode-backend:v1.1 quay.io/kubealex/image-mode-backend:v1.1-rhel10.1
-
-podman push quay.io/kubealex/image-mode-backend:v1.1
-podman push quay.io/kubealex/image-mode-backend:v1.1-rhel10.1
-```
-
-```bash
-cd frontend
-git checkout v1.1
-
-podman build --build-arg API_HOST=im-train-api.demo.lab -t quay.io/kubealex/image-mode-frontend:v1.1 .
-podman tag quay.io/kubealex/image-mode-frontend:v1.1 quay.io/kubealex/image-mode-frontend:v1.1-rhel10.1
-
-podman push quay.io/kubealex/image-mode-frontend:v1.1
-podman push quay.io/kubealex/image-mode-frontend:v1.1-rhel10.1
+./im-train-demo release-app
 ```
 
 ```bash
@@ -123,57 +97,25 @@ ssh bootc-user@im-train.demo.lab
 sudo bootc switch --apply --soft-reboot=auto quay.io/kubealex/image-mode-frontend:v1.1
 ```
 
-### 5b — Ops: Build Base OS (RHEL 10.2)
+After reboot — verify timetable feature:
 
 ```bash
-cd baseos
-git checkout rhel10.2
-
-podman build -t quay.io/kubealex/image-mode-baseos:rhel10.2 .
-podman tag quay.io/kubealex/image-mode-baseos:rhel10.2 quay.io/kubealex/image-mode-baseos:latest
-
-podman push quay.io/kubealex/image-mode-baseos:rhel10.2
-podman push quay.io/kubealex/image-mode-baseos:latest
-
-podman rmi --force quay.io/kubealex/image-mode-baseos:rhel10.2 quay.io/kubealex/image-mode-baseos:latest
-podman image prune --force
-podman pull quay.io/kubealex/image-mode-baseos:rhel10.2
-podman tag quay.io/kubealex/image-mode-baseos:rhel10.2 quay.io/kubealex/image-mode-baseos:latest
+ssh bootc-user@im-train-api.demo.lab
+curl http://localhost:3001/api/timetable
 ```
 
-### 5c — Rebuild All on RHEL 10.2 + Upgrade VMs
+Open browser: `http://im-train.demo.lab:5173` (Timetable page now available)
+
+### Ops: Build Base OS (RHEL 10.2)
 
 ```bash
-cd db
-git checkout pg16
-
-podman build --pull=always -t quay.io/kubealex/image-mode-db:pg16 .
-podman tag quay.io/kubealex/image-mode-db:pg16 quay.io/kubealex/image-mode-db:pg16-rhel10.2
-
-podman push quay.io/kubealex/image-mode-db:pg16
-podman push quay.io/kubealex/image-mode-db:pg16-rhel10.2
+./im-train-demo upgrade-baseos
 ```
 
-```bash
-cd backend
-git checkout v1.1
-
-podman build --pull=always --build-arg DB_HOST=im-train-db.demo.lab -t quay.io/kubealex/image-mode-backend:v1.1 .
-podman tag quay.io/kubealex/image-mode-backend:v1.1 quay.io/kubealex/image-mode-backend:v1.1-rhel10.2
-
-podman push quay.io/kubealex/image-mode-backend:v1.1
-podman push quay.io/kubealex/image-mode-backend:v1.1-rhel10.2
-```
+### Rebuild All on RHEL 10.2 + Upgrade VMs
 
 ```bash
-cd frontend
-git checkout v1.1
-
-podman build --pull=always --build-arg API_HOST=im-train-api.demo.lab -t quay.io/kubealex/image-mode-frontend:v1.1 .
-podman tag quay.io/kubealex/image-mode-frontend:v1.1 quay.io/kubealex/image-mode-frontend:v1.1-rhel10.2
-
-podman push quay.io/kubealex/image-mode-frontend:v1.1
-podman push quay.io/kubealex/image-mode-frontend:v1.1-rhel10.2
+./im-train-demo upgrade-vms
 ```
 
 ```bash
@@ -189,4 +131,21 @@ sudo bootc upgrade --apply --soft-reboot=auto
 ```bash
 ssh bootc-user@im-train.demo.lab
 sudo bootc upgrade --apply --soft-reboot=auto
+```
+
+After reboot — verify OS upgrade:
+
+```bash
+ssh bootc-user@im-train.demo.lab
+cat /etc/redhat-release
+```
+
+Expected: `Red Hat Enterprise Linux release 10.2`
+
+---
+
+## Cleanup
+
+```bash
+./im-train-demo cleanup
 ```
