@@ -876,17 +876,17 @@ usage() {
   echo "Configuration is prompted on first use and saved to .demo-config."
   echo ""
   echo "Day 1 -- Initial deployment (run in order):"
-  echo "  infra        Set up libvirt network and storage pool"
-  echo "  1            Build base OS image (RHEL 10.1)"
-  echo "  2            Convert to qcow2 and provision 3 VMs"
-  echo "  3            Build and deploy database (PostgreSQL)"
-  echo "  4            Build and deploy apps v1.0 (backend + frontend)"
-  echo "  all          Run the full day-1 flow (infra -> 1 -> 2 -> 3 -> 4)"
+  echo "  infra            Set up libvirt network and storage pool"
+  echo "  build-baseos     Build base OS image (RHEL 10.1)"
+  echo "  deploy-vms       Convert to qcow2 and provision 3 VMs"
+  echo "  build-db         Build and deploy database (PostgreSQL)"
+  echo "  build-apps       Build and deploy apps v1.0 (backend + frontend)"
+  echo "  all              Run the full day-1 flow"
   echo ""
   echo "Day 2 -- Upgrade scenarios (run in order after day 1):"
-  echo "  5a           App release: build and deploy v1.1 on RHEL 10.1"
-  echo "  5b           Ops: build new base OS (RHEL 10.2)"
-  echo "  5c           Rebuild all on RHEL 10.2 and upgrade VMs"
+  echo "  release-app      App release: build and deploy v1.1 on RHEL 10.1"
+  echo "  upgrade-baseos   Ops: build new base OS (RHEL 10.2)"
+  echo "  upgrade-vms      Rebuild all on RHEL 10.2 and upgrade VMs"
   echo ""
   echo "Lifecycle:"
   echo "  prebuild     Build and push ALL images upfront (speeds up the demo)"
@@ -900,12 +900,12 @@ usage() {
   echo ""
   echo "Examples:"
   echo "  demo.sh infra            # Set up network and storage pool"
-  echo "  demo.sh 1                # Build base OS (RHEL 10.1)"
-  echo "  demo.sh 2                # Convert qcow2 + provision VMs"
+  echo "  demo.sh build-baseos     # Build base OS (RHEL 10.1)"
+  echo "  demo.sh deploy-vms       # Convert qcow2 + provision VMs"
   echo "  demo.sh all              # Full day-1 deployment"
-  echo "  demo.sh 5a               # App release v1.1 on RHEL 10.1"
-  echo "  demo.sh 5b               # Ops: build base OS RHEL 10.2"
-  echo "  demo.sh 5c               # Rebuild all on RHEL 10.2 + upgrade VMs"
+  echo "  demo.sh release-app      # App release v1.1 on RHEL 10.1"
+  echo "  demo.sh upgrade-baseos   # Ops: build base OS RHEL 10.2"
+  echo "  demo.sh upgrade-vms      # Rebuild all on RHEL 10.2 + upgrade VMs"
   echo "  demo.sh cleanup          # Tear down everything"
   echo ""
   echo "Environment:"
@@ -926,29 +926,29 @@ case "$STEP_ARG" in
     setup_network; pause
     setup_pool
     ;;
-  1)
+  build-baseos|1)
     step1_build_baseos
     ;;
-  2)
+  deploy-vms|2)
     step2_convert_qcow2; pause
     provision_vms
     ;;
-  3)
+  build-db|3)
     step3_build_db; pause
     step3_deploy_db
     ;;
-  4)
+  build-apps|4)
     step4_build_apps; pause
     step4_deploy_apps
     ;;
-  5a)
+  release-app|5a)
     step5a_build_apps; pause
     step5a_update_vms
     ;;
-  5b)
+  upgrade-baseos|5b)
     step5b_build_baseos
     ;;
-  5c)
+  upgrade-vms|5c)
     step5c_rebuild_all; pause
     step5c_upgrade_vms
     ;;
