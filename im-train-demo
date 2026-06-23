@@ -843,20 +843,14 @@ step5c_upgrade_vms() {
   echo ""
 
   step "Upgrade DB VM"
-  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/db/Containerfile"
-  read -rp "Press Enter to continue..."
   vm_cmd "${VM_DB}" "sudo bootc upgrade --apply --soft-reboot=auto"
   echo ""
 
   step "Upgrade backend VM"
-  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/backend/Containerfile"
-  read -rp "Press Enter to continue..."
   vm_cmd "${VM_BACKEND}" "sudo bootc upgrade --apply --soft-reboot=auto"
   echo ""
 
   step "Upgrade frontend VM"
-  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/frontend/Containerfile"
-  read -rp "Press Enter to continue..."
   vm_cmd "${VM_FRONTEND}" "sudo bootc upgrade --apply --soft-reboot=auto"
   echo ""
 
