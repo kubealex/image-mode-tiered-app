@@ -771,6 +771,47 @@ step5b_build_baseos() {
 #   Starting state: RHEL 10.1, apps v1.1 (after 5a), baseos 10.2 ready (after 5b)
 #   Rebuild DB + apps v1.1 on 10.2 base, same tags → bootc upgrade
 # ─────────────────────────────────────────────────────────────
+step5c_rebuild_db() {
+  ensure_vm_config
+  banner "Step 5c — Rebuild DB on RHEL 10.2 + Upgrade VM"
+
+  step "Verifying baseos:latest matches RHEL 10.2"
+  local latest_sha ver_sha
+  latest_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:latest" 2>/dev/null || true)
+  ver_sha=$(podman image inspect --format '{{.Id}}' "${REGISTRY}/image-mode-baseos:rhel10.2" 2>/dev/null || true)
+  if [[ -z "$ver_sha" ]]; then
+    echo "ERROR: baseos:rhel10.2 not found — run step 5b first." >&2; exit 1
+  fi
+  if [[ "$latest_sha" != "$ver_sha" ]]; then
+    echo "ERROR: baseos:latest does not match baseos:rhel10.2 — run step 5b to rebuild." >&2; exit 1
+  fi
+  info "baseos:latest SHA matches rhel10.2 ✔"
+
+  local saved_db
+  saved_db=$(submodule_save_ref "$SCRIPT_DIR/db")
+
+  step "Rebuilding image-mode-db:pg16 (now on RHEL 10.2)"
+  cd "$SCRIPT_DIR/db"
+  submodule_checkout . pg16
+  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/db/Containerfile"
+  read -rp "Press Enter to continue..."
+  podman build --pull=always -t "${REGISTRY}/image-mode-db:pg16" .
+  podman tag "${REGISTRY}/image-mode-db:pg16" "${REGISTRY}/image-mode-db:pg16-rhel10.2"
+  podman push "${REGISTRY}/image-mode-db:pg16"
+  podman push "${REGISTRY}/image-mode-db:pg16-rhel10.2"
+
+  submodule_restore_ref "$SCRIPT_DIR/db" "$saved_db"
+
+  echo ""
+  step "Upgrading DB VM"
+  vm_cmd "${VM_DB}" "sudo bootc upgrade --apply --soft-reboot=auto"
+  echo ""
+
+  step "Verify after reboot:"
+  vm_cmd "${VM_DB}" "cat /etc/redhat-release"
+  info "Expected: Red Hat Enterprise Linux release 10.2"
+}
+
 step5c_rebuild_all() {
   ensure_vm_config
   banner "Step 5c — Rebuild all images on RHEL 10.2"
@@ -924,6 +965,7 @@ usage() {
   echo "Day 2 -- Upgrade scenarios (run in order after day 1):"
   echo "  release-app      App release: build and deploy v1.1 on RHEL 10.1"
   echo "  upgrade-baseos   Ops: build new base OS (RHEL 10.2)"
+  echo "  upgrade-db       Rebuild DB on RHEL 10.2 and upgrade DB VM"
   echo "  upgrade-vms      Rebuild all on RHEL 10.2 and upgrade VMs"
   echo ""
   echo "Lifecycle:"
@@ -988,6 +1030,9 @@ case "$STEP_ARG" in
     ;;
   upgrade-baseos|5b)
     step5b_build_baseos
+    ;;
+  upgrade-db)
+    step5c_rebuild_db
     ;;
   upgrade-vms|5c)
     step5c_rebuild_all; pause
