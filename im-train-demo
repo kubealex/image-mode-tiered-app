@@ -408,19 +408,19 @@ show_containerfiles() {
   banner "Image Mode Train Service — Containerfile Walkthrough"
 
   step "Base OS — Hardened RHEL with OpenSCAP PCI-DSS"
-  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/baseos/Containerfile"
+  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/baseos/Containerfile"
   pause
 
   step "Database — PostgreSQL on base OS"
-  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/db/Containerfile"
+  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/db/Containerfile"
   pause
 
   step "Backend — Express.js API on base OS"
-  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/backend/Containerfile"
+  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/backend/Containerfile"
   pause
 
   step "Frontend — React + Vite on base OS"
-  bat --style=header,grid --language=Dockerfile "$SCRIPT_DIR/frontend/Containerfile"
+  bat --paging=never --style=header,grid --language=Dockerfile "$SCRIPT_DIR/frontend/Containerfile"
 }
 
 # ─────────────────────────────────────────────────────────────
