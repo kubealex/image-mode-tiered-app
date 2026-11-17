@@ -61,4 +61,4 @@ All routes are prefixed with `/api`:
 - No test framework is configured; there are no existing tests.
 - No linter or formatter is configured.
 - Container images are named `train-db`, `train-backend`, `train-frontend`.
-- The base OS image is published to `quay.io/kubealex/image-mode-baseos:10.1`.
+- The base OS image is published to `quay.io/kubealex/image-mode-baseos:rhel10.2`.

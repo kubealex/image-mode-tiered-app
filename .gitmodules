@@ -1,7 +1,7 @@
 [submodule "baseos"]
 	path = baseos
 	url = https://github.com/kubealex/image-mode-baseos.git
-	branch = rhel10.1
+	branch = rhel10.2
 [submodule "frontend"]
 	path = frontend
 	url = https://github.com/kubealex/image-mode-frontend.git

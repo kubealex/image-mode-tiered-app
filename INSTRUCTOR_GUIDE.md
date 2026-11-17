@@ -21,7 +21,7 @@ source im-train-demo-completion.bash
 
 ## Day 1 — Initial Deployment
 
-### Build Base OS (RHEL 10.1)
+### Build Base OS (RHEL 10.2)
 
 ```bash
 ./im-train-demo build-baseos
@@ -80,7 +80,7 @@ Open browser: `http://im-train.demo.lab:5173`
 
 ## Day 2 — Lifecycle
 
-### App Release: v1.1 on RHEL 10.1
+### App Release: v1.1 on RHEL 10.2
 
 ```bash
 ./im-train-demo release-app
@@ -88,12 +88,12 @@ Open browser: `http://im-train.demo.lab:5173`
 
 ```bash
 ssh -i baseos/demo-key bootc-user@im-train-api.demo.lab
-sudo bootc switch --apply --soft-reboot=auto quay.io/kubealex/image-mode-backend:v1.1
+sudo bootc upgrade --apply --soft-reboot=auto --tag v1.1
 ```
 
 ```bash
 ssh -i baseos/demo-key bootc-user@im-train.demo.lab
-sudo bootc switch --apply --soft-reboot=auto quay.io/kubealex/image-mode-frontend:v1.1
+sudo bootc upgrade --apply --soft-reboot=auto --tag v1.1
 ```
 
 After reboot — verify timetable feature:
@@ -105,13 +105,13 @@ curl http://localhost:3001/api/timetable
 
 Open browser: `http://im-train.demo.lab:5173` (Timetable page now available)
 
-### Ops: Build Base OS (RHEL 10.2)
+### Ops: Build Base OS (RHEL 10.3)
 
 ```bash
 ./im-train-demo upgrade-baseos
 ```
 
-### Rebuild All on RHEL 10.2 + Upgrade VMs
+### Rebuild All on RHEL 10.3 + Upgrade VMs
 
 ```bash
 ./im-train-demo upgrade-vms
@@ -139,7 +139,7 @@ ssh bootc-user@im-train.demo.lab
 cat /etc/redhat-release
 ```
 
-Expected: `Red Hat Enterprise Linux release 10.2`
+Expected: `Red Hat Enterprise Linux release 10.3`
 
 ---
 

@@ -29,7 +29,7 @@ All images extend the baseos image. VMs are provisioned from baseos qcow2, then 
 
 ---
 
-## Act 1 — Operations: Base OS (RHEL 10.1)
+## Act 1 — Operations: Base OS (RHEL 10.2)
 
 The operations team builds the PCI-DSS hardened base image and converts it to a qcow2 disk image for VM provisioning.
 
@@ -37,10 +37,10 @@ The operations team builds the PCI-DSS hardened base image and converts it to a 
 
 ```bash
 cd baseos
-git checkout rhel10.1
+git checkout rhel10.2
 
-podman build -t quay.io/kubealex/image-mode-baseos:rhel10.1 .
-podman push quay.io/kubealex/image-mode-baseos:rhel10.1
+podman build -t quay.io/kubealex/image-mode-baseos:rhel10.2 .
+podman push quay.io/kubealex/image-mode-baseos:rhel10.2
 ```
 
 ### Convert to qcow2
@@ -54,7 +54,7 @@ sudo podman run --rm -it --privileged --pull=newer \
   -v /var/lib/containers/storage:/var/lib/containers/storage \
   registry.redhat.io/rhel10/bootc-image-builder:latest \
   --type qcow2 \
-  quay.io/kubealex/image-mode-baseos:rhel10.1
+  quay.io/kubealex/image-mode-baseos:rhel10.2
 ```
 
 The qcow2 image is written to `./output/qcow2/disk.qcow2`.
@@ -69,7 +69,7 @@ Create 3 VMs from the qcow2 image — one for each tier:
 | vm-backend | backend.example.com | Backend |
 | vm-db | db.example.com | Database |
 
-All VMs boot into a clean RHEL 10.1 system with PCI-DSS hardening, ready for their application layer.
+All VMs boot into a clean RHEL 10.2 system with PCI-DSS hardening, ready for their application layer.
 
 ---
 
@@ -159,7 +159,7 @@ curl http://vm-frontend:5173/
 
 ---
 
-## Act 4 — Operations: OS upgrade to RHEL 10.2
+## Act 4 — Operations: OS upgrade to RHEL 10.3
 
 The operations team releases a new base image. Each team rebuilds their image on top of the new base, then upgrades their VMs — with soft reboot on RHEL 10.
 
@@ -167,19 +167,19 @@ The operations team releases a new base image. Each team rebuilds their image on
 
 ```bash
 cd baseos
-git checkout rhel10.2
+git checkout rhel10.3
 
-podman build -t quay.io/kubealex/image-mode-baseos:rhel10.2 .
-podman tag quay.io/kubealex/image-mode-baseos:rhel10.2 \
+podman build -t quay.io/kubealex/image-mode-baseos:rhel10.3 .
+podman tag quay.io/kubealex/image-mode-baseos:rhel10.3 \
   quay.io/kubealex/image-mode-baseos:latest
 
-podman push quay.io/kubealex/image-mode-baseos:rhel10.2
+podman push quay.io/kubealex/image-mode-baseos:rhel10.3
 podman push quay.io/kubealex/image-mode-baseos:latest
 ```
 
 ### DB team: Rebuild and push
 
-The Containerfile uses `FROM baseos:latest`, which now resolves to RHEL 10.2.
+The Containerfile uses `FROM baseos:latest`, which now resolves to RHEL 10.3.
 
 ```bash
 cd db
@@ -223,14 +223,14 @@ ssh bootc-user@vm-frontend
 sudo bootc upgrade --soft-reboot=auto --apply
 ```
 
-After the soft reboot, each VM is running RHEL 10.2 with the same application layer. Downtime is measured in seconds.
+After the soft reboot, each VM is running RHEL 10.3 with the same application layer. Downtime is measured in seconds.
 
 ### Verify
 
 ```bash
 ssh bootc-user@vm-frontend
 cat /etc/redhat-release
-# Red Hat Enterprise Linux release 10.2
+# Red Hat Enterprise Linux release 10.3
 
 curl http://vm-backend:3001/api/health
 # {"status":"ok","backend":{"status":"ok"},"database":{"status":"ok"}}
@@ -240,7 +240,7 @@ curl http://vm-backend:3001/api/health
 
 ## Act 5 — App team: Release v1.1 (Timetable feature)
 
-The app team releases a new version with the Timetable feature. The VMs switch to the new image tag using soft reboot.
+The app team releases a new version with the Timetable feature. RHEL 10.2+ supports `bootc upgrade --tag`, so VMs can upgrade to a new tag without switching images.
 
 ### Build and push v1.1
 
@@ -260,20 +260,18 @@ podman build \
 podman push quay.io/kubealex/image-mode-frontend:v1.1
 ```
 
-### Switch VMs to v1.1
+### Upgrade VMs to v1.1
 
-Since the image tag changes (v1.0 → v1.1), we use `bootc switch` instead of `bootc upgrade`.
+Since RHEL 10.2+ supports `bootc upgrade --tag`, we can upgrade to a new tag without switching images.
 
 ```bash
 # On vm-backend
 ssh bootc-user@vm-backend
-sudo bootc switch --soft-reboot=auto --apply \
-  quay.io/kubealex/image-mode-backend:v1.1
+sudo bootc upgrade --soft-reboot=auto --apply --tag v1.1
 
 # On vm-frontend
 ssh bootc-user@vm-frontend
-sudo bootc switch --soft-reboot=auto --apply \
-  quay.io/kubealex/image-mode-frontend:v1.1
+sudo bootc upgrade --soft-reboot=auto --apply --tag v1.1
 ```
 
 ### Verify
@@ -304,13 +302,13 @@ This switches back to the previous image and reboots.
 
 | Step | Who | Action | Command |
 |------|-----|--------|---------|
-| 1 | Ops | Build baseos RHEL 10.1, convert to qcow2 | `bootc-image-builder --type qcow2` |
+| 1 | Ops | Build baseos RHEL 10.2, convert to qcow2 | `bootc-image-builder --type qcow2` |
 | 2 | Ops | Provision 3 VMs from qcow2 | Hypervisor |
 | 3 | DB | Switch db VM to postgres image | `bootc switch ...image-mode-db:pg16` |
 | 4 | App | Switch VMs to frontend/backend v1.0 | `bootc switch ...image-mode-{frontend,backend}:v1.0` |
-| 5 | Ops | Release baseos RHEL 10.2 | Build + push `baseos:rhel10.2` + `latest` |
+| 5 | Ops | Release baseos RHEL 10.3 | Build + push `baseos:rhel10.3` + `latest` |
 | 6 | All | Rebuild images on new base, upgrade VMs | `bootc upgrade --soft-reboot=auto --apply` |
-| 7 | App | Release v1.1, switch VMs | `bootc switch --soft-reboot=auto --apply` |
+| 7 | App | Release v1.1, upgrade VMs | `bootc upgrade --soft-reboot=auto --apply --tag v1.1` |
 
 ## References
 

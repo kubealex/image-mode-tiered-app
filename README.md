@@ -33,7 +33,7 @@ A three-tier train ticket booking application designed to run as RHEL bootc/imag
 
 | Component | Tags |
 |-----------|------|
-| baseos | `latest`, `rhel10.2`, `rhel10.1` |
+| baseos | `latest`, `rhel10.3`, `rhel10.2` |
 | frontend | `v1.1`, `v1.0` |
 | backend | `v1.1`, `v1.0` |
 | db | `pg16` |
@@ -74,7 +74,7 @@ The entire demo lifecycle is driven by `im-train-demo`. On first run it prompts 
 
 ```bash
 im-train-demo infra           # Set up libvirt network and storage pool
-im-train-demo build-baseos    # Build base OS image (RHEL 10.1)
+im-train-demo build-baseos    # Build base OS image (RHEL 10.2)
 im-train-demo deploy-vms      # Convert to qcow2 and provision 3 VMs
 im-train-demo build-db        # Build and deploy database (PostgreSQL)
 im-train-demo build-apps      # Build and deploy apps v1.0 (backend + frontend)
@@ -89,10 +89,10 @@ im-train-demo all
 ### Day 2 — Upgrade scenarios
 
 ```bash
-im-train-demo release-app     # App release: build and deploy v1.1 on RHEL 10.1
-im-train-demo upgrade-baseos  # Ops: build new base OS (RHEL 10.2)
-im-train-demo upgrade-db      # Rebuild DB on RHEL 10.2 and upgrade DB VM
-im-train-demo upgrade-vms     # Rebuild all on RHEL 10.2 and upgrade VMs
+im-train-demo release-app     # App release: build and deploy v1.1 on RHEL 10.2
+im-train-demo upgrade-baseos  # Ops: build new base OS (RHEL 10.3)
+im-train-demo upgrade-db      # Rebuild DB on RHEL 10.3 and upgrade DB VM
+im-train-demo upgrade-vms     # Rebuild all on RHEL 10.3 and upgrade VMs
 ```
 
 ### Other commands

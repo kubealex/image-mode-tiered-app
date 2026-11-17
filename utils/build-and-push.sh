@@ -13,7 +13,7 @@ Build and optionally push all Train Tickets container images.
 Each component is built from its git tag, so the image matches the tagged source exactly.
 
 Options:
-  --baseos-tag TAG       Base OS tag to build (default: latest git tag on baseos, e.g. rhel10.2)
+  --baseos-tag TAG       Base OS tag to build (default: latest git tag on baseos, e.g. rhel10.3)
   --frontend-tag TAG     Frontend tag to build (default: latest git tag on frontend, e.g. v1.1)
   --backend-tag TAG      Backend tag to build (default: latest git tag on backend, e.g. v1.1)
   --db-tag TAG           Database tag to build (default: latest git tag on db, e.g. pg16)
@@ -26,7 +26,7 @@ Options:
 Examples:
   $0                                        # Build latest tags, push
   $0 --no-push                              # Build only
-  $0 --baseos-tag rhel10.1                  # Build baseos from rhel10.1 tag
+  $0 --baseos-tag rhel10.2                  # Build baseos from rhel10.2 tag
   $0 --frontend-tag v1.0 --backend-tag v1.0 # Build older versions
   REGISTRY=quay.io/myorg $0                 # Use a different registry
   $0 --db-host db.example.com --api-host backend.example.com
